@@ -130,6 +130,8 @@ class Dataset:
             # Write wav file:
             sf.write(n_file_name, chunk, samplerate,
                      self._db_format['codec_sf'])
+        # Delete input file:
+        os.remove(input)
 
     def add_item(self, input_file, codec_specifier):
         """add_item
