@@ -1,0 +1,23 @@
+{
+    "audio_length": 3,
+    "center": true,
+    "classes": [
+        "fake_wav",
+        "true_wav"
+    ],
+    "hop_length": 256,
+    "input_shape": [
+        64,
+        517,
+        1
+    ],
+    "mono": true,
+    "n_fft": 2048,
+    "n_frames": 517,
+    "n_mels": 64,
+    "pad_mode": "reflect",
+    "power": 2.0,
+    "sr": 44100,
+    "win_length": 2048,
+    "window": "hann"
+}
