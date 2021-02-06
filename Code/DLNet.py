@@ -1,22 +1,12 @@
 # %%
-# Import necessary packages
-# import matplotlib.pyplot as plt
-# import IPython.display as pd
 from DLNet_functions import preprocess_wrapper
-
 from pathlib import Path
-# from librosa import display
-# import librosa
 import json
-# import tqdm
 import glob
-# import os
-# import soundfile as sf
-# import numpy as np
 import tensorflow as tf
-# from tensorflow import keras
 assert tf.__version__ >= "2.0"
-
+# autotune computation
+AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 # %%
 # Create Config for preprocessing and pipeline parameters
@@ -57,11 +47,6 @@ dataset_uncompr = wrapper.gen_tf_dataset('_data/uncompr_wav')
 dataset_full = wrapper.gen_tf_dataset('_data/*_wav/*')
 dataset_combi = dataset_mp3_32k.concatenate(dataset_uncompr)
 
-#%%
-
-# save dataset to disk
-tf.data.experimental.save(
-    dataset=dataset_full, path=f'./_data/dataset', compression='GZIP')
 # show tensor types and shapes in dataset (we need this to load the dataset later)
 print(dataset_full.element_spec)
 
