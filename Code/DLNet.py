@@ -48,8 +48,9 @@ with open('DLNet_config.json', 'w+') as fp:
     json.dump(config, fp, sort_keys=True, indent=4)
 
 # %%
+# VISUALIZE WAVEFORMS
 # get all wav files
-fps = glob.glob('_data/*_wav/*/*.wav', recursive=True)
+fps = glob.glob('_data/*_wav/_*/*.wav', recursive=True)
 fps_random = []
 np.random.seed(9)
 
@@ -71,6 +72,7 @@ for r in range(nrows):
         fps_random.append(fp_random)
 
 # %%
+# VISUALIZE SPECTROGRAMS
 # setup subplot 
 nrows, ncols = 4, 2
 fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 12))
@@ -123,6 +125,7 @@ print()
 
 
 # %%
+# Preprocessing
 # generate mel-filter matrix
 mel_filter = librosa.filters.mel(config['sr'], 
                                  config['n_fft'], 
@@ -163,25 +166,31 @@ def load_and_preprocess_data(file_path):
                              win_length=config['win_length'], window=config['window'], 
                              center=config['center'], dtype=np.complex64, pad_mode=config['pad_mode'])
 
+    # calculate magnitude and scale to dB
+    magspec = librosa.amplitude_to_db(np.abs(stft), ref=np.max)
+
     # filter stft with mel-filter
     mel_spec = mel_filter.dot(np.abs(stft).astype(np.float32) ** config['power'])
     
+    # add channel dimension for conv layer compatibility
+    magspec = np.expand_dims(magspec, axis=-1)
+
     # add channel dimension for conv layer compatibility
     mel_spec = np.expand_dims(mel_spec, axis=-1)
     
     # get ground truth from file_path string
     one_hot = folder_name_to_one_hot(file_path)
     
-    return mel_spec, one_hot
+    return magspec, one_hot
 
 # there is a TF bug where we get an error if the size of the tensor from a py.function is not set manualy
 # when called from a map()-function.
 def preprocessing_wrapper(file_path):
-    mel_spec, one_hot = tf.py_function(load_and_preprocess_data, [file_path], [tf.float32, tf.uint8])
+    magspec, one_hot = tf.py_function(load_and_preprocess_data, [file_path], [tf.float32, tf.uint8])
     
-    mel_spec.set_shape([config['n_mels'], config['n_frames'], 1])
+    magspec.set_shape([config['n_fft'], config['n_frames'], 1])
     one_hot.set_shape([len(config['classes'])])
-    return mel_spec, one_hot
+    return magspec, one_hot
 
 
 # %%
@@ -191,7 +200,7 @@ def preprocessing_wrapper(file_path):
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 # folder with the training data
-wavset = '_data/*_wav/*/*.wav'
+wavset = '_data/*_wav/_*/*.wav'
 # define a dataset of file paths
 dataset = tf.data.Dataset.list_files(wavset)
 # run the preprocessing via map
@@ -203,6 +212,7 @@ tf.data.experimental.save(dataset=dataset, path=f'./_data/dataset', compression=
 print(dataset.element_spec)
 
 
+
 # %%
 # load a dataset from disk
 
@@ -212,18 +222,18 @@ dataset = tf.data.experimental.load(f'./_data/dataset',
                                     compression='GZIP')
 
 # shuffle before splitting in train and eval dataset
-dataset = dataset.shuffle(buffer_size=18000)
+dataset = dataset.shuffle(buffer_size=np.int(len(dataset)))
 dataset = dataset.cache()
 
 # take first 80% from dataset
-train_dataset = dataset.take(14400)
-train_dataset = train_dataset.shuffle(buffer_size= 18000)
+train_dataset = dataset.take(np.int(4/5*len(dataset)))
+train_dataset = train_dataset.shuffle(buffer_size= np.int(len(dataset)))
 train_dataset = train_dataset.batch(64)
 train_dataset = train_dataset.prefetch(AUTOTUNE)
 
 
 # take last 20% samples from dataset 
-eval_dataset = dataset.skip(14400).batch(64).prefetch(AUTOTUNE)
+eval_dataset = dataset.skip(np.int(4/5*len(dataset))).batch(64).prefetch(AUTOTUNE)
 
 
 # %%
@@ -241,17 +251,45 @@ model.add(tf.keras.layers.Conv2D(128, (3, 3), activation="relu"))
 model.add(tf.keras.layers.GlobalMaxPool2D())
 model.add(tf.keras.layers.Dense(len(config['classes']), activation="sigmoid"))
 
+# Define metrics
+metrics = [tf.keras.metrics.TrueNegatives(),
+           tf.keras.metrics.TruePositives(),
+           tf.keras.metrics.FalseNegatives(),
+           tf.keras.metrics.FalsePositives(),
+           tf.keras.metrics.Precision(),
+           tf.keras.metrics.Recall(),
+           tf.keras.metrics.CategoricalAccuracy()
+          ]
+
 # compile model
+n_epochs = 10
 model.compile(optimizer='adam',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
 # fit model
-model.fit(train_dataset, epochs=5)
-model.evaluate(eval_dataset)
+history = model.fit(train_dataset, epochs=n_epochs, validation_data=eval_dataset)
 
+# %% 
+# setup plot
+fig, ax = plt.subplots(nrows=1, ncols=2,figsize=(16,4))
+
+# plot loss
+ax[0].plot(range(n_epochs), history.history['loss'])
+ax[0].plot(range(n_epochs), history.history['val_loss'])
+ax[0].set_ylabel('loss'), ax[0].set_title('train_loss vs val_loss')
+
+# plot accuracy
+ax[1].plot(range(n_epochs), history.history['categorical_accuracy'])
+ax[1].plot(range(n_epochs), history.history['val_categorical_accuracy'])
+ax[1].set_ylabel('accuracy'), ax[1].set_title('train_acc vs val_acc')
+
+# plot adjustement
+for a in ax:
+    a.grid(True)
+    a.legend(['train','val'], loc=4)
+    a.set_xlabel('num of Epochs')
+    
+plt.show()
 
 # %%
-
-
-
