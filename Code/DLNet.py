@@ -4,6 +4,7 @@ import json
 import glob
 import numpy as np
 import librosa
+from librosa import display
 import matplotlib.pyplot as plt
 from DLNet_functions import preprocess_wrapper
 import tensorflow as tf
@@ -64,7 +65,7 @@ else:
 # %%
 # VISUALIZE WAVEFORMS
 # get all wav files
-fps = glob.glob('_data/*_wav/_*/*.wav', recursive=True)
+fps = glob.glob('_data/*_wav/**/*.wav', recursive=True)
 fps_random = []
 np.random.seed(9)
 
@@ -163,7 +164,7 @@ train_dataset = train_dataset.prefetch(AUTOTUNE)
 # take last 20% samples from dataset
 test_dataset = dataset.skip(test_size).shuffle(test_size)
 test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
-
+eval_dataset = test_dataset
 
 # %%
 # create model architecture
