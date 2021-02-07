@@ -7,7 +7,7 @@ import glob
 import matplotlib.pyplot as plt
 class Dataset:
 
-    def __init__(self, json_file):
+    def __init__(self, json_file: str) -> None:
         """__init__
         Constructs dataset object from json config file.
 
@@ -39,8 +39,8 @@ class Dataset:
                                 if key in self._codec_list}
         self._db_format = self._codec_settings['db_format']
 
-    def encode(self, input, output, codec_out, channels_out, bitrate_out,
-               sampling_rate_out):
+    def encode(self, input: str, output: str, codec_out: str, channels_out: int,
+               bitrate_out: int, sampling_rate_out: int) -> subprocess:
         """encode_audio
         Encodes audio into specified format by codec_out.
 
@@ -72,7 +72,7 @@ class Dataset:
                               {output}"],
                               capture_output=True, shell=True)
 
-    def decode(self, input, output):
+    def decode(self, input: str, output: str) -> subprocess:
         """decode
         Decodes input to db_format and writes file to output.
 
@@ -95,7 +95,7 @@ class Dataset:
                                {output}"],
                               capture_output=True, shell=True)
 
-    def split_audio(self, input):
+    def split_audio(self, input: str) -> None:
         """split_audio
         Splits audio file into chunks depending on size set in json config.
         Wav file is cropped to fit integer number of chunks.
@@ -130,8 +130,10 @@ class Dataset:
             # Write wav file:
             sf.write(n_file_name, chunk, samplerate,
                      self._db_format['codec_sf'])
+        # Delete input file:
+        os.remove(input)
 
-    def add_item(self, input_file, codec_specifier):
+    def add_item(self, input_file: str, codec_specifier: str) -> None:
         """add_item
         Add item to the dataset with specified codec. If file exists in seed
         list, file will not be added.
@@ -195,7 +197,7 @@ class Dataset:
         # Delete seed:
         os.remove(input_file)
 
-    def add_dir(self, input_dir, codec_specifier):
+    def add_dir(self, input_dir: str, codec_specifier: str) -> None:
         """add_dir
         Add a directory of wav files to the dataset with specified codec.
 
@@ -212,7 +214,7 @@ class Dataset:
         for file in fps:
             self.add_item(file, codec_specifier)
 
-    def get_codec_specifiers(self):
+    def get_codec_specifiers(self) -> []:
         """get_codec_specifiers
         Returns all possible codec specifiers.
 
@@ -223,7 +225,7 @@ class Dataset:
         """
         return self._codec_list
 
-    def get_stats(self):
+    def get_stats(self) -> {}:
         n_chunk_arr = np.zeros(len(self._codec_list))
         for idx, codec in enumerate(self._codec_list):
             if codec != 'db_format':
