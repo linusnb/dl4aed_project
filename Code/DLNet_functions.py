@@ -77,9 +77,15 @@ class preprocess_wrapper:
         dataset = dataset.map(self.preprocessing_wrapper,
                               num_parallel_calls=AUTOTUNE)
         # save dataset to disk
-        name = os.path.split(directory)[1]
+        name = 'dataset_'+os.path.split(directory)[1]
         path = os.path.join('_data', name)
         tf.data.experimental.save(dataset=dataset,
                                   path=path,
                                   compression='GZIP')
         return dataset
+
+    def load_tf_dataset(self, directory: str):
+        return tf.data.experimental.load(directory,
+                        (tf.TensorSpec(self._config['input_shape'], dtype=tf.float32, name=None),
+                         tf.TensorSpec(len(self._config['classes']), dtype=tf.uint8, name=None)),
+                        compression='GZIP')
