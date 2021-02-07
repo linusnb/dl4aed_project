@@ -51,7 +51,7 @@ with open('DLNet_config.json', 'w+') as fp:
 
 # Creater wrapper object:
 wrapper = preprocess_wrapper(config)
-#%%
+# %%
 # Generate datasets (true) or load datasets (false):
 generate = True
 if generate:
@@ -67,8 +67,9 @@ else:
     dataset = dataset_2.concatenate(dataset_1)
 
 # %%
+# VISUALIZE WAVEFORMS
 # get all wav files
-fps = glob.glob('_data/*_wav/*/*.wav', recursive=True)
+fps = glob.glob('_data/*_wav/_*/*.wav', recursive=True)
 fps_random = []
 np.random.seed(9)
 
@@ -90,6 +91,7 @@ for r in range(nrows):
         fps_random.append(fp_random)
 
 # %%
+# VISUALIZE SPECTROGRAMS
 # setup subplot
 nrows, ncols = 4, 2
 fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 12))
@@ -99,19 +101,25 @@ for i, fp_random in enumerate(fps_random):
     audio, sr = librosa.core.load(fp_random, sr=None)
 
     # calculate stft
-    stft = librosa.stft(audio, n_fft=config['n_fft'], hop_length=config['hop_length'], win_length=config['win_length'])
+    stft = librosa.stft(audio, n_fft=config['n_fft'],
+                        hop_length=config['hop_length'],
+                        win_length=config['win_length'])
 
     # calculate melspec
     melspec = librosa.feature.melspectrogram(audio, n_fft=config['n_fft'],
-    hop_length=config['hop_length'], n_mels=config['n_mels'], fmax=int(config['sr']/2))
+                                             hop_length=config['hop_length'],
+                                             n_mels=config['n_mels'],
+                                             fmax=int(config['sr']/2))
     melspec = librosa.amplitude_to_db(melspec, ref=np.max)
 
     # calculate magnitude and scale to dB
     magspec = librosa.amplitude_to_db(np.abs(stft), ref=np.max)
 
     # plot with librosa
-    librosa.display.specshow(magspec, x_axis='time', y_axis='linear', sr=sr, hop_length=256, ax=ax[i][0])
-    librosa.display.specshow(melspec, x_axis='time', y_axis='mel', sr=sr, hop_length=256, ax=ax[i][1])
+    librosa.display.specshow(magspec, x_axis='time', y_axis='linear', sr=sr,
+                             hop_length=256, ax=ax[i][0])
+    librosa.display.specshow(melspec, x_axis='time', y_axis='mel', sr=sr,
+                             hop_length=256, ax=ax[i][1])
 
     # adjustments
     # ax[i][1].set_yticks([])
@@ -135,9 +143,11 @@ plt.subplots_adjust(hspace=0.1, wspace=0.1)
 
 print('Melspec shape: %s' % (str(melspec.shape)))
 print('Stft shape: %s' % (str(stft.shape)))
-print(f'Total data points in mel-spectrogram: {melspec.shape[0]*melspec.shape[1]}')
+print(f'Total data points in mel-spectrogram: \
+      {melspec.shape[0]*melspec.shape[1]}')
 print(f'Total data points in stft-spectrogram: {stft.shape[0]*stft.shape[1]}')
-print(f'-> Data Reduction by factor: {(stft.shape[0]*stft.shape[1]) / (melspec.shape[0]*melspec.shape[1])}')
+print(f'-> Data Reduction by factor: \
+      {(stft.shape[0]*stft.shape[1]) / (melspec.shape[0]*melspec.shape[1])}')
 
 
 # %% Prepare dataset
@@ -175,14 +185,46 @@ model.add(tf.keras.layers.Conv2D(128, (3, 3), activation="relu"))
 model.add(tf.keras.layers.GlobalMaxPool2D())
 model.add(tf.keras.layers.Dense(len(config['classes']), activation="sigmoid"))
 
+# Define metrics
+metrics = [tf.keras.metrics.TrueNegatives(),
+           tf.keras.metrics.TruePositives(),
+           tf.keras.metrics.FalseNegatives(),
+           tf.keras.metrics.FalsePositives(),
+           tf.keras.metrics.Precision(),
+           tf.keras.metrics.Recall(),
+           tf.keras.metrics.CategoricalAccuracy()
+          ]
+
 # compile model
+n_epochs = 10
 model.compile(optimizer='adam',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
 # fit model
-model.fit(train_dataset, epochs=5)
-model.evaluate(test_dataset)
+history = model.fit(train_dataset, epochs=n_epochs,
+                    validation_data=eval_dataset)
 
+# %% 
+# setup plot
+fig, ax = plt.subplots(nrows=1, ncols=2,figsize=(16,4))
+
+# plot loss
+ax[0].plot(range(n_epochs), history.history['loss'])
+ax[0].plot(range(n_epochs), history.history['val_loss'])
+ax[0].set_ylabel('loss'), ax[0].set_title('train_loss vs val_loss')
+
+# plot accuracy
+ax[1].plot(range(n_epochs), history.history['categorical_accuracy'])
+ax[1].plot(range(n_epochs), history.history['val_categorical_accuracy'])
+ax[1].set_ylabel('accuracy'), ax[1].set_title('train_acc vs val_acc')
+
+# plot adjustement
+for a in ax:
+    a.grid(True)
+    a.legend(['train','val'], loc=4)
+    a.set_xlabel('num of Epochs')
+    
+plt.show()
 
 # %%
