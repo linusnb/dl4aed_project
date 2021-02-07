@@ -3,12 +3,7 @@ from pathlib import Path
 import json
 import glob
 import numpy as np
-# import soundfile as sf
-# import os
-# import tqdm
 import librosa
-# from librosa import display
-# import IPython.display as pd
 import matplotlib.pyplot as plt
 from DLNet_functions import preprocess_wrapper
 import tensorflow as tf
@@ -193,7 +188,7 @@ metrics = [tf.keras.metrics.TrueNegatives(),
            tf.keras.metrics.Precision(),
            tf.keras.metrics.Recall(),
            tf.keras.metrics.CategoricalAccuracy()
-          ]
+           ]
 
 # compile model
 n_epochs = 10
@@ -205,7 +200,7 @@ model.compile(optimizer='adam',
 history = model.fit(train_dataset, epochs=n_epochs,
                     validation_data=eval_dataset)
 
-# %% 
+# %%
 # setup plot
 fig, ax = plt.subplots(nrows=1, ncols=2,figsize=(16,4))
 
@@ -224,7 +219,6 @@ for a in ax:
     a.grid(True)
     a.legend(['train','val'], loc=4)
     a.set_xlabel('num of Epochs')
-    
 plt.show()
 
 # %%
