@@ -8,6 +8,18 @@ assert tf.__version__ >= "2.0"
 # autotune computation
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
+import numpy as np
+import soundfile as sf
+import os
+import glob
+import tqdm
+import json
+import librosa
+from librosa import display
+from pathlib import Path
+import IPython.display as pd
+import matplotlib.pyplot as plt
+
 # %%
 # Create Config for preprocessing and pipeline parameters
 
@@ -15,9 +27,9 @@ config = {'sr': 44100,
           'audio_length': 1,
           'mono': True,
           'n_mels': 64,
-          'n_fft': 2048,
+          'n_fft': 1024,
           'hop_length': 256,
-          'win_length': 2048,
+          'win_length': 512,
           'window': 'hann',
           'center': True,
           'pad_mode': 'reflect',
@@ -46,6 +58,79 @@ dataset_mp3_32k = wrapper.gen_tf_dataset('_data/compressed_wav/mp3_32k')
 dataset_uncompr = wrapper.gen_tf_dataset('_data/uncompr_wav')
 dataset_full = wrapper.gen_tf_dataset('_data/*_wav/*')
 dataset_combi = dataset_mp3_32k.concatenate(dataset_uncompr)
+# %%
+# get all wav files
+fps = glob.glob('_data/*_wav/*/*.wav', recursive=True)
+fps_random = []
+np.random.seed(9)
+
+# setup subplot 
+nrows, ncols = 2, 2
+fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 6))
+
+# plot some audio waveforms
+for r in range(nrows):
+    for c in range(ncols):
+        fp_random = fps[np.random.randint(len(fps))]
+        audio, sr = librosa.core.load(fp_random, sr=None)
+        ax[r][c].plot(audio, c='k')
+        # ax[r][c].axis('off')
+        ax[r][c].set_title(Path(fp_random).parts[-2:])
+        if r == 0:
+            ax[r][c].set_xticks([])
+        # save random audio filepaths
+        fps_random.append(fp_random)
+
+# %%
+# setup subplot 
+nrows, ncols = 4, 2
+fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 12))
+
+# plot some audio waveforms
+for i, fp_random in enumerate(fps_random):
+    audio, sr = librosa.core.load(fp_random, sr=None)
+
+    # calculate stft
+    stft = librosa.stft(audio, n_fft=config['n_fft'], hop_length=config['hop_length'], win_length=config['win_length'])
+    
+    # calculate melspec
+    melspec = librosa.feature.melspectrogram(audio, n_fft=config['n_fft'],
+    hop_length=config['hop_length'], n_mels=config['n_mels'], fmax=int(config['sr']/2))
+    melspec = librosa.amplitude_to_db(melspec, ref=np.max)
+
+    # calculate magnitude and scale to dB
+    magspec = librosa.amplitude_to_db(np.abs(stft), ref=np.max)
+
+    # plot with librosa
+    librosa.display.specshow(magspec, x_axis='time', y_axis='linear', sr=sr, hop_length=256, ax=ax[i][0])
+    librosa.display.specshow(melspec, x_axis='time', y_axis='mel', sr=sr, hop_length=256, ax=ax[i][1])
+    
+    # adjustments
+    # ax[i][1].set_yticks([])
+    ax[i][1].set_ylabel(Path(fp_random).parts[-2], rotation=270, labelpad=20)
+    ax[i][1].yaxis.set_label_position("right")
+    
+    # settings for all axises but bottom ones
+    if not i == len(fps_random) - 1:
+        ax[i][0].set_xticks([])
+        ax[i][1].set_xticks([])
+        ax[i][0].set_xlabel('')
+        ax[i][1].set_xlabel('')
+    
+    # settings for upper axises
+    if i == 0:
+        ax[i][0].set_title('stft')
+        ax[i][1].set_title('mel spectrogram')   
+
+# adjust whitespace in between subplots        
+plt.subplots_adjust(hspace=0.1, wspace=0.1)
+
+print('Melspec shape: %s' % (str(melspec.shape)))
+print('Stft shape: %s' % (str(stft.shape)))
+print(f'Total data points in mel-spectrogram: {melspec.shape[0]*melspec.shape[1]}')
+print(f'Total data points in stft-spectrogram: {stft.shape[0]*stft.shape[1]}')
+print(f'-> Data Reduction by factor: {(stft.shape[0]*stft.shape[1]) / (melspec.shape[0]*melspec.shape[1])}')
+print()
 
 # show tensor types and shapes in dataset (we need this to load the dataset later)
 print(dataset_full.element_spec)
