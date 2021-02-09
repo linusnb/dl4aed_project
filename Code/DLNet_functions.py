@@ -4,7 +4,7 @@ import tensorflow as tf
 from librosa import filters
 from librosa import core
 import numpy as np
-
+import json
 
 class preprocess_wrapper:
 
@@ -89,3 +89,11 @@ class preprocess_wrapper:
                         (tf.TensorSpec(self._config['input_shape'], dtype=tf.float32, name=None),
                          tf.TensorSpec(len(self._config['classes']), dtype=tf.uint8, name=None)),
                         compression='GZIP')
+
+def get_classes_from_dataset(json_file: str):
+    # Read json Dataset_config
+    with open(json_file, "r") as read_file:
+        config = json.load(read_file)
+        # Get list of codec settings:
+        codec_list = list(config.keys())[4:]
+        
