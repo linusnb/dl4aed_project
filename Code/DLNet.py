@@ -46,16 +46,17 @@ with open('DLNet_config.json', 'w+') as fp:
     json.dump(config, fp, sort_keys=True, indent=4)
 
 # Creater wrapper object:
-wrapper = preprocess_wrapper(config)
+ds_config = 'dl4aed_project/Code/_data/dataset_config.json'
+wrapper = preprocess_wrapper(config, ds_config)
 # %%
 # Generate datasets (true) or load datasets (false):
 generate = True
 if generate:
-    # Generate mp3_32k dataset and uncompressed wav dataset:
-    dataset_mp3_32k = wrapper.gen_tf_dataset('_data/compressed_wav/mp3_32k')
-    dataset_uncompr = wrapper.gen_tf_dataset('_data/uncompr_wav')
-    # dataset_full = wrapper.gen_tf_dataset('_data/*_wav/*')
-    dataset = dataset_mp3_32k.concatenate(dataset_uncompr)
+    # Generate mp3_32k dataset and uncompressed wav dataset from dirs
+    # this dataset will not be saved!
+    dirs = ['_data/compressed_wav/mp3_32k',
+            '_data/uncompr_wav']
+    dataset = wrapper.gen_tf_dataset_from_list(dirs)
 else:
     # Load dataset:
     dataset_1 = wrapper.load_tf_dataset('_data/dataset_mp3_32k')

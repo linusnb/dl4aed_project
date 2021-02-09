@@ -11,22 +11,24 @@ import os
 
 @pytest.fixture
 def datapath():
-    return os.path.join(os.path.dirname(os.path.realpath(__file__)), 'test_dataset/_data')
+    return os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                        'test_dataset/_data')
+
 
 @pytest.fixture
 def database(datapath):
-    # filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'test_dataset/_data')
-    return Dataset(os.path.join(datapath, "dataset_config.json"))
+    return Dataset(os.path.join(datapath, "dataset_config.json"), 'new_ds')
+
 
 def test_init(database):
     assert isinstance(database, Dataset)
 
 
 def test_encode_audio(database, datapath):
-    input = os.path.join(datapath, "seed_files/test_file.wav")
-    output_path = os.path.join(datapath, "compressed_wav/mp3_160k")
+    input = os.path.join(datapath, 'new_ds', "seed_files/test_file.wav")
+    output_path = os.path.join(datapath, 'new_ds', "compressed_wav/mp3_160k")
     if not os.path.isdir(output_path):
-            os.makedirs(os.path.join(output_path))
+        os.makedirs(os.path.join(output_path))
     output = os.path.join(output_path, "test_file.mp3")
     codec = database._codec_settings['mp3_160k']
     codec_out = codec['codec']
@@ -34,8 +36,8 @@ def test_encode_audio(database, datapath):
     bitrate_out = codec['bitrate']
     sampling_rate_out = codec['sampling_rate']
     database.encode(input, output, codec_out, channels_out, bitrate_out,
-                          sampling_rate_out)
-    assert os.path.isfile(output) == True
+                    sampling_rate_out)
+    assert os.path.isfile(output) is True
     assert codec_out == 'libmp3lame'
     assert channels_out == 2
     assert bitrate_out == 160000

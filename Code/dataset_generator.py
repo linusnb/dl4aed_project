@@ -5,9 +5,11 @@ import numpy as np
 import soundfile as sf
 import glob
 import matplotlib.pyplot as plt
+
+
 class Dataset:
 
-    def __init__(self, json_file: str) -> None:
+    def __init__(self, json_file: str, root_specifc: str) -> None:
         """__init__
         Constructs dataset object from json config file.
 
@@ -21,6 +23,8 @@ class Dataset:
             config = json.load(read_file)
         # Root dir:
         root_dir, _ = os.path.split(json_file)
+        # Add root specification
+        root_dir = os.path.join(root_dir, root_specifc)
         # Get seed path:
         self._seed_dir = os.path.join(root_dir, config['reference_audio_path'])
         # Get location of uncompressed waves
@@ -39,8 +43,9 @@ class Dataset:
                                 if key in self._codec_list}
         self._db_format = self._codec_settings['db_format']
 
-    def encode(self, input: str, output: str, codec_out: str, channels_out: int,
-               bitrate_out: int, sampling_rate_out: int) -> subprocess:
+    def encode(self, input: str, output: str, codec_out: str,
+               channels_out: int, bitrate_out: int,
+               sampling_rate_out: int) -> subprocess:
         """encode_audio
         Encodes audio into specified format by codec_out.
 
