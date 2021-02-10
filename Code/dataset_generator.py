@@ -22,16 +22,17 @@ class Dataset:
         with open(json_file, "r") as read_file:
             config = json.load(read_file)
         # Root dir:
-        root_dir, _ = os.path.split(json_file)
+        self._root_dir, _ = os.path.split(json_file)
         # Add root specification
-        root_dir = os.path.join(root_dir, root_specifc)
+        self._root_dir = os.path.join(self._root_dir, root_specifc)
         # Get seed path:
-        self._seed_dir = os.path.join(root_dir, config['reference_audio_path'])
+        self._seed_dir = os.path.join(self._root_dir,
+                                      config['reference_audio_path'])
         # Get location of uncompressed waves
-        self._uncompr_dir = os.path.join(root_dir,
+        self._uncompr_dir = os.path.join(self._root_dir,
                                          config['uncompr_audio_path'])
         # Get location of compressed waves
-        self._compr_dir = os.path.join(root_dir,
+        self._compr_dir = os.path.join(self._root_dir,
                                        config['compressed_audio_path'])
         # Get chunk size
         self._chunk_size = config['segment_length']
@@ -69,13 +70,17 @@ class Dataset:
         subprocess
             Subprocess running an ffmpeg command.
         """
-        return subprocess.run([f"ffmpeg -y -i {input} \
-                              -acodec {codec_out} \
-                              -ac {channels_out} \
-                              -ab {bitrate_out} \
-                              -ar {sampling_rate_out} \
-                              {output}"],
-                              capture_output=True, shell=True)
+        subprocess.run([f"ffmpeg -y -i {input} \
+                        -acodec {codec_out} \
+                        -ac {channels_out} \
+                        -ab {bitrate_out} \
+                        -ar {sampling_rate_out} \
+                        {output}"],
+                       capture_output=True, shell=True)
+        if os.path.isfile(output):
+            return 0
+        else:
+            raise ValueError(f'Failed to create encoded file {output}.')
 
     def decode(self, input: str, output: str) -> subprocess:
         """decode
@@ -93,12 +98,19 @@ class Dataset:
         [type]
             Command prompt for ffmpeg
         """
-        return subprocess.run([f"ffmpeg -i {input} \
-                               -acodec {self._db_format['codec_ffmpeg']} \
-                               -ac {self._db_format['channels']} \
-                               -ar {self._db_format['sampling_rate']} \
-                               {output}"],
-                              capture_output=True, shell=True)
+        if os.path.isfile(input):
+            subprocess.run([f"ffmpeg -i {input} \
+                            -acodec {self._db_format['codec_ffmpeg']} \
+                            -ac {self._db_format['channels']} \
+                            -ar {self._db_format['sampling_rate']} \
+                            {output}"],
+                           capture_output=True, shell=True)
+            if os.path.isfile(output):
+                return 0
+            else:
+                raise ValueError(f'Failed to create encoded file {output}.')
+        else:
+            raise ValueError(f"Failed to read input {input}.")
 
     def split_audio(self, input: str) -> None:
         """split_audio
@@ -240,6 +252,9 @@ class Dataset:
                 path = os.path.join(self._uncompr_dir, '**/*.wav')
                 n_chunk_arr[idx] = len(glob.glob(path, recursive=True))
         n_total_chunks = np.sum(n_chunk_arr)
+        print(f'Number of total chunks:{n_total_chunks}')
         plt.bar(self._codec_list, n_chunk_arr)
         plt.xticks(rotation=45)
+        plt.title(f'Dataset in {self._root_dir}')
+        plt.show()
         return dict(zip(self._codec_list, n_chunk_arr.T)), n_total_chunks
