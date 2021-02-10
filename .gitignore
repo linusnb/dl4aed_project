@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.log
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# vs code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Dataset and wav files
+_data/
+*.wav
+*.mp3
+*.aac
+*.flac
