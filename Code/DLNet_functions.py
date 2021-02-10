@@ -5,7 +5,7 @@ from librosa import filters
 from librosa import core
 import numpy as np
 import json
-
+import glob
 
 class preprocess_wrapper:
     """ Wrapper object for creating, reading and preprocessing datasets.
@@ -193,9 +193,33 @@ class preprocess_wrapper:
             name = 'dataset_'+ds_name
             path = os.path.join('_data', name)
             tf.data.experimental.save(dataset=dataset,
-                                    path=path,
-                                    compression='GZIP')
+                                      path=path,
+                                      compression='GZIP')
         return dataset
+
+    def gen_tf_test_train_dataset(self, directory, save=False):
+
+        # Read seed file
+        seed_dir = os.path.join(directory, "seed_files/seed_list.txt")
+        if not os.path.isfile(seed_dir):
+            raise ValueError('Cannot finde seed file.')
+        with open(seed_dir, 'r') as f:
+            lines = f.readlines()
+        # Empty lists
+        train_set_lst = []
+        test_set_lst = []
+        # Get all files in dir:
+        files_path = os.path.join(directory, '**/*.wav')
+        fps = glob.glob(files_path, recursive=True)
+        # Iterate over seed file list
+        seed_length = len(lines)
+        seed_to_train = int(.8*seed_length)
+        for idx, line in enumerate(lines):
+            seed, _ = os.path.splitext(lines)
+            if idx < seed_to_train:
+                train_set_lst.append(file for file in fps if seed in file)
+            else:
+                test_set_lst.append(file for file in fps if seed in file)
 
     def load_tf_dataset(self, directory: str):
         """
