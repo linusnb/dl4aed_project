@@ -10,7 +10,7 @@ import librosa
 import matplotlib.pyplot as plt
 from DLNet_functions import Preprocess_wrapper
 import tensorflow as tf
-from datetime import datetime
+from time import strftime
 assert tf.__version__ >= "2.0"
 # autotune computation
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -26,7 +26,7 @@ config: {} = {'sr': 44100,
               'audio_length': 1,
               'mono': True,
               'n_mels': 64,
-             'n_fft': 1024,
+              'n_fft': 1024,
               'hop_length': 256,
               'win_length': 512,
               'window': 'hann',
@@ -51,12 +51,13 @@ if CALCULATE_MEL:
 else:
     config['input_shape']: (int, int, int) = (config['n_fft'], config['n_frames'], 1)
 
+time_stamp = f'{strftime("%d/%m/%Y_%H_%M")}'
 # save config
-with open(f'DLNet_config.json{now.strftime("%d/%m/%Y_%H_%M")}', 'w+') as fp:
+with open(f'DLNet_config.json{time_stamp}', 'w+') as fp:
     json.dump(config, fp, sort_keys=True, indent=4)
 
 # Creater wrapper object:
-ds_config: str = 'dl4aed_project/Code/_data/dataset_config.json'
+ds_config: str = f'dl4aed_project/Code/_data/dataset_config{time_stamp}.json'
 wrapper: Preprocess_wrapper = Preprocess_wrapper(config, ds_config)
 
 
