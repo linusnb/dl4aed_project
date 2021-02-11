@@ -29,15 +29,15 @@ seed_path = os.path.join(db._seed_dir, '**/*.wav')
 
 
 # %% 
-# fps = glob.glob(seed_path, recursive=True)
-# for file in fps[:10]:
-#     # Add item to this codec:
-#     db.add_item(file)
-# dict, total = db.get_stats()
+fps = glob.glob(seed_path, recursive=True)
+for file in fps:
+    # Add item to this codec:
+    db.add_item(file)
+dict, total = db.get_stats()
 
 
 # %%
-fps = glob.glob(seed_path, recursive=True)
-db.add_item(fps[0])
+# fps = glob.glob(seed_path, recursive=True)
+# db.add_item(fps[0])
 
 # %%

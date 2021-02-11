@@ -30,15 +30,21 @@ class Dataset:
         # Get seed path:
         self._seed_dir = os.path.join(self._root_dir,
                                       config['reference_audio_path'])
+                                      # Get location of uncompressed waves
+        self._uncompr_dir = os.path.join(self._root_dir,
+                                         config['uncompr_audio_path'])
+        # Get location of compressed waves
+        self._compr_dir = os.path.join(self._root_dir,
+                                       config['compressed_audio_path'])
         # Get chunk size
         self._chunk_size = config['segment_length']
         # Get list of codec settings:
         self._key_list = list(config.keys())
-        self._codec_list = self._key_list[2:]
+        self._codec_list = self._key_list[4:]
         # Get dict with codec settings:
         self._codec_settings = {key: value for key, value in config.items()
                                 if key in self._codec_list}
-        self._wav_format = self._codec_settings['lossless_wav']
+        self._wav_format = self._codec_settings['uncompr_wav']
 
     def encode(self, input: str, output: str, codec_name: dict) -> bool:
         """encode_audio
@@ -149,29 +155,34 @@ class Dataset:
         is_split = False
         # Iterate over codec list:
         for codec in self._codec_list:
-            # Output path: dataset_name/codec_name/seed_number
-            enc_output_path = os.path.join(self._root_dir, codec,
+            # Output path: dataset_name/compressed_wav/codec_name/seed_number
+            enc_output_path = os.path.join(self._compr_dir, codec,
                                            str(n_seeds+1))
             # If compressed output directory not existing -> make directory
             if not os.path.isdir(enc_output_path):
                 os.makedirs(os.path.join(enc_output_path))
-            # Label data
             # Encodec output file path
             enc_out_file = os.path.join(enc_output_path, in_f_name + '.' +
                                         self._codec_settings[codec]
                                         .get('format'))
             # Decoded output file path
-            dec_out_file = os.path.join(enc_output_path, in_f_name_wav)
             # Encode to codec_specifier
-            if codec != 'lossless_wav':
+            if codec != 'uncompr_wav':
                 self.encode(input_file, enc_out_file, codec)
                 # decode to wav
-                self.encode(enc_out_file, dec_out_file, 'lossless_wav')
+                dec_out_file = os.path.join(enc_output_path, in_f_name_wav)
+                self.encode(enc_out_file, dec_out_file, 'uncompr_wav')
                 # Remove encoded file:
                 os.remove(enc_out_file)
             # Convert to wav
             else:
-                self.encode(input_file, dec_out_file, 'lossless_wav')
+                dec_out_path = os.path.join(self._uncompr_dir, str(n_seeds+1))
+                # If uncompressed dir does not exist:
+                if not os.path.isdir(dec_out_path):
+                    os.makedirs(dec_out_path)
+                # Uncompressed file path:
+                dec_out_file = os.path.join(dec_out_path, in_f_name_wav)
+                self.encode(input_file, dec_out_file, 'uncompr_wav')
             # Split decoded file:
             is_split = self.split_audio(dec_out_file)
             if is_split:
@@ -219,8 +230,12 @@ class Dataset:
     def get_stats(self) -> {}:
         n_chunk_arr = np.zeros(len(self._codec_list))
         for idx, codec in enumerate(self._codec_list):
-            path = os.path.join(self._root_dir, codec, '**/*.wav')
-            n_chunk_arr[idx] = len(glob.glob(path, recursive=True))
+            if codec != 'uncompr_wav':
+                path = os.path.join(self._compr_dir, codec, '**/*.wav')
+                n_chunk_arr[idx] = len(glob.glob(path, recursive=True))
+            else:
+                path = os.path.join(self._uncompr_dir, '**/*.wav')
+                n_chunk_arr[idx] = len(glob.glob(path, recursive=True))
         n_total_chunks = np.sum(n_chunk_arr)
         print(f'Number of total chunks:{n_total_chunks}')
         plt.bar(self._codec_list, n_chunk_arr)
