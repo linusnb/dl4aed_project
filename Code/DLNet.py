@@ -6,7 +6,7 @@ import json
 import glob
 import numpy as np
 import librosa
-# from librosa import display
+from librosa import display
 import matplotlib.pyplot as plt
 from DLNet_functions import Preprocess_wrapper
 import tensorflow as tf
@@ -34,7 +34,7 @@ config: {} = {'sr': 44100,
               'pad_mode': 'reflect',
               'power': 2.0,
               'calculate_mel': CALCULATE_MEL
-          }
+              }
 
 # save classes from foldernames
 # folders = glob.glob('_data/*_wav/')
@@ -51,9 +51,9 @@ if CALCULATE_MEL:
 else:
     config['input_shape']: (int, int, int) = (config['n_fft'], config['n_frames'], 1)
 
-time_stamp = f'{strftime("%d/%m/%Y_%H_%M")}'
+time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
 # save config
-with open(f'DLNet_config.json{time_stamp}', 'w+') as fp:
+with open(f'DLNet_config_{strftime("%d_%m_%Y_%H_%M")}.json', 'w') as fp:
     json.dump(config, fp, sort_keys=True, indent=4)
 
 # Creater wrapper object:
@@ -241,5 +241,3 @@ for a in ax:
     a.legend(['train','val'], loc=4)
     a.set_xlabel('num of Epochs')
 plt.show()
-
-
