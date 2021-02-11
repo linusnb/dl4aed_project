@@ -1,4 +1,5 @@
 import os
+from os.path import split
 import subprocess
 import json
 import numpy as np
@@ -29,25 +30,17 @@ class Dataset:
         # Get seed path:
         self._seed_dir = os.path.join(self._root_dir,
                                       config['reference_audio_path'])
-        # Get location of uncompressed waves
-        self._uncompr_dir = os.path.join(self._root_dir,
-                                         config['uncompr_audio_path'])
-        # Get location of compressed waves
-        self._compr_dir = os.path.join(self._root_dir,
-                                       config['compressed_audio_path'])
         # Get chunk size
         self._chunk_size = config['segment_length']
         # Get list of codec settings:
         self._key_list = list(config.keys())
-        self._codec_list = self._key_list[4:]
+        self._codec_list = self._key_list[2:]
         # Get dict with codec settings:
         self._codec_settings = {key: value for key, value in config.items()
                                 if key in self._codec_list}
-        self._db_format = self._codec_settings['db_format']
+        self._wav_format = self._codec_settings['lossless_wav']
 
-    def encode(self, input: str, output: str, codec_out: str,
-               channels_out: int, bitrate_out: int,
-               sampling_rate_out: int) -> subprocess:
+    def encode(self, input: str, output: str, codec_name: dict) -> bool:
         """encode_audio
         Encodes audio into specified format by codec_out.
 
@@ -57,61 +50,18 @@ class Dataset:
             Input file with complete path and file extension
         output : str
             Output file with complete path and file extension
-        codec_out : str
-            Encoder
-        channels_out : int
-            Number of channels of codec
-        bitrate_out : int
-            Bitrate for codec setting
-        sampling_rate_out : int
-            Sampling rate of codec
-
         Returns
         -------
-        subprocess
-            Subprocess running an ffmpeg command.
+        bool
+            True, if file was created.
         """
-        subprocess.run([f"ffmpeg -y -i {input} \
-                        -acodec {codec_out} \
-                        -ac {channels_out} \
-                        -ab {bitrate_out} \
-                        -ar {sampling_rate_out} \
-                        {output}"],
+        ffmpeg_command = self._codec_settings[codec_name].get('ffmpeg_command')
+        subprocess.run(ffmpeg_command.format(input, output),
                        capture_output=True, shell=True)
         if os.path.isfile(output):
-            return 0
+            return True
         else:
             raise ValueError(f'Failed to create encoded file {output}.')
-
-    def decode(self, input: str, output: str) -> subprocess:
-        """decode
-        Decodes input to db_format and writes file to output.
-
-        Parameters
-        ----------
-        input : str
-            Input file with complete path and file extension
-        output : str
-            Output file with complete path without file extension
-
-        Returns
-        -------
-        [type]
-            Command prompt for ffmpeg
-        """
-        if os.path.isfile(input):
-            subprocess.run([f"ffmpeg -i {input} \
-                            -acodec {self._db_format['codec_ffmpeg']} \
-                            -ac {self._db_format['channels']} \
-                            -ar {self._db_format['sampling_rate']} \
-                            {output}"],
-                           capture_output=True, shell=True)
-            if os.path.isfile(output):
-                return 0
-            else:
-                raise ValueError(f'Failed to create encoded file {output}.')
-        else:
-            raise ValueError(f"Failed to read input {input}.")
 
     def split_audio(self, input: str) -> bool:
         """split_audio
@@ -131,6 +81,8 @@ class Dataset:
         n_chunks = int(np.floor(n_samples/(self._chunk_size*samplerate)))
         # Crop data
         data = data[:int(n_chunks*self._chunk_size*samplerate)]
+        # Normalise data
+        data /= np.max(np.abs(data))
         # Update number of sample
         n_samples = data.shape[0]
         # Reshape cropped data into arrays of chunk_length:
@@ -139,9 +91,11 @@ class Dataset:
         # Filter depending on RMS value: chunk rms > .5*data_rms
         filter = np.sqrt(np.mean(chunk_arr**2, axis=(1, 2))) > \
                         (.5*np.sqrt(np.mean(chunk_arr**2)))
-        if chunk_arr[filter].size > 50:
+        chunk_arr = chunk_arr[filter]
+        if chunk_arr.shape[0] > 50:
             # Pick random 50 samples from filtert array:
-            samples = random.sample(chunk_arr[filter], 50)
+            chunk_idx = set(np.arange(chunk_arr.shape[0]))
+            samples_idx = random.sample(chunk_idx, 50)
         else:
             # Delete input file:
             os.remove(input)
@@ -149,17 +103,19 @@ class Dataset:
         # Output file path:
         # Remove file extension from input file path
         in_file_path, _ = os.path.splitext(input)
+        out_file_path, _ = os.path.split(in_file_path)
         # Only return chunks with rms greater then half of average rms
-        for idx, chunk in enumerate(samples):
-            n_file_name = f"{in_file_path}" + f"_c{idx+1}.wav"
+        for idx, sample_idx in enumerate(samples_idx):
+            # n_file_name = f"{in_file_path}" + f"_c{idx+1}.wav"
+            n_file_name = os.path.join(out_file_path, f"{idx+1}.wav")
             # Write wav file:
-            sf.write(n_file_name, chunk, samplerate,
-                     self._db_format['codec_sf'])
+            sf.write(n_file_name, chunk_arr[sample_idx, :], samplerate,
+                     self._wav_format['codec_sf'])
         # Delete input file:
         os.remove(input)
         return True
 
-    def add_item(self, input_file: str, codec_specifier: str) -> None:
+    def add_item(self, input_file: str) -> None:
         """add_item
         Add item to the dataset with specified codec. If file exists in seed
         list, file will not be added.
@@ -168,65 +124,69 @@ class Dataset:
         ----------
         input_file : str
             Path to new input file.
-        codec_specifier : str
-            Codec specifier, item from list of possible codecs.
 
         Raises
         ------
         ValueError
             [description]
         """
-        if codec_specifier not in self._codec_list:
-            raise ValueError("Invalid codec specifier.")
         # Get filename of input file
         # Remove path extension of input file
         _, in_f_name_wav = os.path.split(input_file)
+        # Remove file extension from input file name
+        in_f_name, _ = os.path.splitext(in_f_name_wav)
+
         # Check if filename is in seed_list
         seed_file = os.path.join(self._seed_dir, "seed_list.txt")
         with open(seed_file) as f:
             lines = f.readlines()
+            n_seeds = len(lines)
             seed_name = in_f_name_wav+'\n'
             if seed_name in lines:
                 raise ValueError(f"File with same name alread in seed \
                                  list:{in_f_name_wav}")
-        # Remove file extension from input file name
-        in_filename, _ = os.path.splitext(in_f_name_wav)
+
+        is_split = False
         # Iterate over codec list:
         for codec in self._codec_list:
-            # Output path
-            enc_output_path = os.path.join(self._root_dir, codec_specifier)
+            # Output path: dataset_name/codec_name/seed_number
+            enc_output_path = os.path.join(self._root_dir, codec,
+                                           str(n_seeds+1))
             # If compressed output directory not existing -> make directory
             if not os.path.isdir(enc_output_path):
                 os.makedirs(os.path.join(enc_output_path))
             # Label data
-            enc_output_file = os.path.join(enc_output_path, in_filename + '.' +
-                                           codec['format'])
-            if codec['format'] != 'wav':
-                # encode to codec_specifier
-                self.encode(input_file, enc_output_file, codec['codec'],
-                            codec['channels'], codec['bitrate'],
-                            codec['sampling_rate'])
-                # decode to db_format
-                dec_output_file = os.path.join(enc_output_path, in_f_name_wav)
-                self.decode(enc_output_file, dec_output_file)
+            # Encodec output file path
+            enc_out_file = os.path.join(enc_output_path, in_f_name + '.' +
+                                        self._codec_settings[codec]
+                                        .get('format'))
+            # Decoded output file path
+            dec_out_file = os.path.join(enc_output_path, in_f_name_wav)
+            # Encode to codec_specifier
+            if codec != 'lossless_wav':
+                self.encode(input_file, enc_out_file, codec)
+                # decode to wav
+                self.encode(enc_out_file, dec_out_file, 'lossless_wav')
                 # Remove encoded file:
-                os.remove(enc_output_file)
-            # if no encoder neccessary
+                os.remove(enc_out_file)
+            # Convert to wav
             else:
-                dec_output_file = os.path.join(self._root_dir, in_f_name_wav)
-                self.decode(input_file, dec_output_file)
-
+                self.encode(input_file, dec_out_file, 'lossless_wav')
             # Split decoded file:
-            if self.split_audio(dec_output_file):
-                # Append seed name to text file
-                with open(seed_file, 'a') as f:
-                    f.write(in_f_name_wav)
-                    f.write("\n")
-                # Delete seed:
-                os.remove(input_file)
-                return True
-            else:
-                return(f'Item: {input_file} not added to dataset.')
+            is_split = self.split_audio(dec_out_file)
+            if is_split:
+                print(f'Added {dec_out_file} to {enc_output_path}.')
+
+        if is_split:
+            # Append seed name to text file
+            with open(seed_file, 'a') as f:
+                f.write(in_f_name_wav)
+                f.write("\n")
+            # Delete seed:
+            os.remove(input_file)
+            return True
+        else:
+            return(f'Item: {input_file} not added to dataset.')
 
     def add_dir(self, input_dir: str, codec_specifier: str) -> None:
         """add_dir
@@ -241,7 +201,7 @@ class Dataset:
         """
         # apply add_item on directory
         # Get all wav files in dir:
-        fps = glob.glob(input_dir+'/**/*.wav', recursive=True)
+        fps = glob.glob(input_dir+'/*.wav', recursive=True)
         for file in fps:
             self.add_item(file, codec_specifier)
 
@@ -259,12 +219,8 @@ class Dataset:
     def get_stats(self) -> {}:
         n_chunk_arr = np.zeros(len(self._codec_list))
         for idx, codec in enumerate(self._codec_list):
-            if codec != 'db_format':
-                path = os.path.join(self._compr_dir, codec, '**/*.wav')
-                n_chunk_arr[idx] = len(glob.glob(path, recursive=True))
-            else:
-                path = os.path.join(self._uncompr_dir, '**/*.wav')
-                n_chunk_arr[idx] = len(glob.glob(path, recursive=True))
+            path = os.path.join(self._root_dir, codec, '**/*.wav')
+            n_chunk_arr[idx] = len(glob.glob(path, recursive=True))
         n_total_chunks = np.sum(n_chunk_arr)
         print(f'Number of total chunks:{n_total_chunks}')
         plt.bar(self._codec_list, n_chunk_arr)
