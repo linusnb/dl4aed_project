@@ -5,6 +5,7 @@ import numpy as np
 import soundfile as sf
 import glob
 import matplotlib.pyplot as plt
+import random
 
 
 class Dataset:
@@ -112,7 +113,7 @@ class Dataset:
         else:
             raise ValueError(f"Failed to read input {input}.")
 
-    def split_audio(self, input: str) -> None:
+    def split_audio(self, input: str) -> bool:
         """split_audio
         Splits audio file into chunks depending on size set in json config.
         Wav file is cropped to fit integer number of chunks.
@@ -138,17 +139,25 @@ class Dataset:
         # Filter depending on RMS value: chunk rms > .5*data_rms
         filter = np.sqrt(np.mean(chunk_arr**2, axis=(1, 2))) > \
                         (.5*np.sqrt(np.mean(chunk_arr**2)))
+        if chunk_arr[filter].size > 50:
+            # Pick random 50 samples from filtert array:
+            samples = random.sample(chunk_arr[filter], 50)
+        else:
+            # Delete input file:
+            os.remove(input)
+            return False
         # Output file path:
         # Remove file extension from input file path
         in_file_path, _ = os.path.splitext(input)
         # Only return chunks with rms greater then half of average rms
-        for idx, chunk in enumerate(chunk_arr[filter]):
+        for idx, chunk in enumerate(samples):
             n_file_name = f"{in_file_path}" + f"_c{idx+1}.wav"
             # Write wav file:
             sf.write(n_file_name, chunk, samplerate,
                      self._db_format['codec_sf'])
         # Delete input file:
         os.remove(input)
+        return True
 
     def add_item(self, input_file: str, codec_specifier: str) -> None:
         """add_item
@@ -171,48 +180,53 @@ class Dataset:
             raise ValueError("Invalid codec specifier.")
         # Get filename of input file
         # Remove path extension of input file
-        _, in_filename_wav = os.path.split(input_file)
+        _, in_f_name_wav = os.path.split(input_file)
         # Check if filename is in seed_list
-        with open(os.path.join(self._seed_dir, "seed_list.txt")) as f:
+        seed_file = os.path.join(self._seed_dir, "seed_list.txt")
+        with open(seed_file) as f:
             lines = f.readlines()
-            seed_name = in_filename_wav+'\n'
+            seed_name = in_f_name_wav+'\n'
             if seed_name in lines:
                 raise ValueError(f"File with same name alread in seed \
-                                 list:{in_filename_wav}")
+                                 list:{in_f_name_wav}")
         # Remove file extension from input file name
-        in_filename, _ = os.path.splitext(in_filename_wav)
-        # if encoder is neccessary
-        if codec_specifier != 'db_format':
-            codec = self._codec_settings[codec_specifier]
+        in_filename, _ = os.path.splitext(in_f_name_wav)
+        # Iterate over codec list:
+        for codec in self._codec_list:
             # Output path
-            enc_output_path = os.path.join(self._compr_dir, codec_specifier)
+            enc_output_path = os.path.join(self._root_dir, codec_specifier)
             # If compressed output directory not existing -> make directory
             if not os.path.isdir(enc_output_path):
                 os.makedirs(os.path.join(enc_output_path))
             # Label data
             enc_output_file = os.path.join(enc_output_path, in_filename + '.' +
                                            codec['format'])
-            # encode to codec_specifier
-            self.encode(input_file, enc_output_file, codec['codec'],
-                        codec['channels'], codec['bitrate'],
-                        codec['sampling_rate'])
-            # decode to db_format
-            dec_output_file = os.path.join(enc_output_path, in_filename_wav)
-            self.decode(enc_output_file, dec_output_file)
-            # Remove encoded file:
-            os.remove(enc_output_file)
-        # if no encoder neccessary
-        else:
-            dec_output_file = os.path.join(self._uncompr_dir, in_filename_wav)
-            self.decode(input_file, dec_output_file)
-        # Split decoded file:
-        self.split_audio(dec_output_file)
-        # Append seed name to text file
-        with open(os.path.join(self._seed_dir, "seed_list.txt"), 'a') as f:
-            f.write(in_filename_wav)
-            f.write("\n")
-        # Delete seed:
-        os.remove(input_file)
+            if codec['format'] != 'wav':
+                # encode to codec_specifier
+                self.encode(input_file, enc_output_file, codec['codec'],
+                            codec['channels'], codec['bitrate'],
+                            codec['sampling_rate'])
+                # decode to db_format
+                dec_output_file = os.path.join(enc_output_path, in_f_name_wav)
+                self.decode(enc_output_file, dec_output_file)
+                # Remove encoded file:
+                os.remove(enc_output_file)
+            # if no encoder neccessary
+            else:
+                dec_output_file = os.path.join(self._root_dir, in_f_name_wav)
+                self.decode(input_file, dec_output_file)
+
+            # Split decoded file:
+            if self.split_audio(dec_output_file):
+                # Append seed name to text file
+                with open(seed_file, 'a') as f:
+                    f.write(in_f_name_wav)
+                    f.write("\n")
+                # Delete seed:
+                os.remove(input_file)
+                return True
+            else:
+                return(f'Item: {input_file} not added to dataset.')
 
     def add_dir(self, input_dir: str, codec_specifier: str) -> None:
         """add_dir
