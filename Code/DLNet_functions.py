@@ -7,7 +7,7 @@ import numpy as np
 import json
 
 
-class preprocess_wrapper:
+class Preprocess_wrapper:
     """ Wrapper object for creating, reading and preprocessing datasets.
     """
     def __init__(self, dlnet_config: dict, ds_config: str, binary=True):
@@ -29,10 +29,11 @@ class preprocess_wrapper:
             self._config['classes'] = ['compressed_wav', 'uncompr_wav']
         else:
             self._config['classes'] = self.get_classes_from_dataset(ds_config)
-        self._mel_filter = filters.mel(self._config['sr'],
-                                       self._config['n_fft'],
-                                       n_mels=dlnet_config['n_mels'],
-                                       norm='slaney')
+        if self._config['calculate_mel']:
+            self._mel_filter = filters.mel(self._config['sr'],
+                                           self._config['n_fft'],
+                                           n_mels=dlnet_config['n_mels'],
+                                           norm='slaney')
 
     # Groundtruth extraction from folder name
     def folder_name_to_one_hot(self, file_path: str):
@@ -96,17 +97,20 @@ class preprocess_wrapper:
                          dtype=np.complex64,
                          pad_mode=self._config['pad_mode'])
 
-        # filter stft with mel-filter
-        mel_spec = self._mel_filter.dot(
-            np.abs(stft).astype(np.float32) ** self._config['power'])
-
-        # add channel dimension for conv layer compatibility
-        mel_spec = np.expand_dims(mel_spec, axis=-1)
-
         # get ground truth from file_path string
         one_hot = self.folder_name_to_one_hot(file_path)
 
-        return mel_spec, one_hot
+        if self._config['calculate_mel']:
+            # filter stft with mel-filter
+            mel_spec = self._mel_filter.dot(
+                np.abs(stft).astype(np.float32) ** self._config['power'])
+
+            # add channel dimension for conv layer compatibility
+            mel_spec = np.expand_dims(mel_spec, axis=-1)
+
+            return mel_spec, one_hot
+
+        return stft, one_hot
 
     def preprocessing_wrapper(self, file_path: str):
         """
@@ -122,13 +126,13 @@ class preprocess_wrapper:
         Tuple(numpy.ndarray, tensorflow.one_hot)
             Mel spectrum and Tensorflow one_hot object.
         """
-        mel_spec, one_hot = tf.py_function(func=self.load_and_preprocess_data,
-                                           inp=[file_path],
-                                           Tout=[tf.float32, tf.uint8])
+        spec, one_hot = tf.py_function(func=self.load_and_preprocess_data,
+                                       inp=[file_path],
+                                       Tout=[tf.float32, tf.uint8])
 
-        mel_spec = tf.ensure_shape(mel_spec, self._config['input_shape'])
+        spec = tf.ensure_shape(spec, self._config['input_shape'])
         one_hot = tf.ensure_shape(one_hot, len(self._config['classes']))
-        return mel_spec, one_hot
+        return spec, one_hot
 
     def gen_tf_dataset(self, directory: str, save=False):
         """

@@ -1,13 +1,16 @@
+# To add a new cell, type '# %%'
+# To add a new markdown cell, type '# %% [markdown]'
 # %%
 from pathlib import Path
 import json
 import glob
 import numpy as np
 import librosa
-from librosa import display
+# from librosa import display
 import matplotlib.pyplot as plt
-from DLNet_functions import preprocess_wrapper
+from DLNet_functions import Preprocess_wrapper
 import tensorflow as tf
+from datetime import datetime
 assert tf.__version__ >= "2.0"
 # autotune computation
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -16,58 +19,72 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 # %%
 # Create Config for preprocessing and pipeline parameters
 
-config = {'sr': 44100,
-          'audio_length': 1,
-          'mono': True,
-          'n_mels': 64,
-          'n_fft': 1024,
-          'hop_length': 256,
-          'win_length': 512,
-          'window': 'hann',
-          'center': True,
-          'pad_mode': 'reflect',
-          'power': 2.0,
+# if true analysis is conducted with mel-spectrograms, if false with "full" spectrograms
+CALCULATE_MEL = True
+
+config: {} = {'sr': 44100,
+              'audio_length': 1,
+              'mono': True,
+              'n_mels': 64,
+             'n_fft': 1024,
+              'hop_length': 256,
+              'win_length': 512,
+              'window': 'hann',
+              'center': True,
+              'pad_mode': 'reflect',
+              'power': 2.0,
+              'calculate_mel': CALCULATE_MEL
           }
 
 # save classes from foldernames
 # folders = glob.glob('_data/*_wav/')
 # config['classes'] = sorted(set([Path(f).parts[-1] for f in folders]))
-config['classes'] = ['compressed_wav', 'uncompr_wav']
+# config['classes'] = ['compressed_wav', 'uncompr_wav']
 
 # save number of frames from length in samples divided by fft hop length
-config['n_frames'] = int(
+config['n_frames']: int = int(
     config['sr']*config['audio_length']/config['hop_length']) + 1
 
 # save input shape for model
-config['input_shape'] = (config['n_mels'], config['n_frames'], 1)
+if CALCULATE_MEL:
+    config['input_shape']: (int, int, int) = (config['n_mels'], config['n_frames'], 1)
+else:
+    config['input_shape']: (int, int, int) = (config['n_fft'], config['n_frames'], 1)
 
 # save config
-with open('DLNet_config.json', 'w+') as fp:
+with open(f'DLNet_config.json{now.strftime("%d/%m/%Y_%H_%M")}', 'w+') as fp:
     json.dump(config, fp, sort_keys=True, indent=4)
 
 # Creater wrapper object:
-ds_config = 'dl4aed_project/Code/_data/dataset_config.json'
-wrapper = preprocess_wrapper(config, ds_config)
+ds_config: str = 'dl4aed_project/Code/_data/dataset_config.json'
+wrapper: Preprocess_wrapper = Preprocess_wrapper(config, ds_config)
+
+
 # %%
 # Generate datasets (true) or load datasets (false):
-generate = True
+
+path_compressed: str = '_data/compressed_wav/mp3_32k'
+path_uncompressed: str = '_data/uncompr_wav'
+
+generate: bool = True
 if generate:
     # Generate mp3_32k dataset and uncompressed wav dataset from dirs
     # this dataset will not be saved!
-    dirs = ['_data/compressed_wav/mp3_32k',
-            '_data/uncompr_wav']
-    dataset = wrapper.gen_tf_dataset_from_list(dirs)
+    dirs: list = [path_compressed,
+                  path_uncompressed]
+    dataset: tf.data.Dataset = wrapper.gen_tf_dataset_from_list(dirs)
 else:
     # Load dataset:
-    dataset_1 = wrapper.load_tf_dataset('_data/dataset_mp3_32k')
-    dataset_2 = wrapper.load_tf_dataset('_data/dataset_uncompr_wav')
-    dataset = dataset_2.concatenate(dataset_1)
+    dataset_1: tf.data.Dataset = wrapper.load_tf_dataset(path_compressed)
+    dataset_2: tf.data.Dataset = wrapper.load_tf_dataset(path_uncompressed)
+    dataset: tf.data.Dataset = dataset_2.concatenate(dataset_1)
+
 
 # %%
 # VISUALIZE WAVEFORMS
 # get all wav files
-fps = glob.glob('_data/*_wav/**/*.wav', recursive=True)
-fps_random = []
+fps: list = glob.glob('_data/*_wav/**/*.wav', recursive=True)
+fps_random: list = []
 np.random.seed(9)
 
 # setup subplot
@@ -86,6 +103,7 @@ for r in range(nrows):
             ax[r][c].set_xticks([])
         # save random audio filepaths
         fps_random.append(fp_random)
+
 
 # %%
 # VISUALIZE SPECTROGRAMS
@@ -140,18 +158,16 @@ plt.subplots_adjust(hspace=0.1, wspace=0.1)
 
 print('Melspec shape: %s' % (str(melspec.shape)))
 print('Stft shape: %s' % (str(stft.shape)))
-print(f'Total data points in mel-spectrogram: \
-      {melspec.shape[0]*melspec.shape[1]}')
+print(f'Total data points in mel-spectrogram: {melspec.shape[0]*melspec.shape[1]}')
 print(f'Total data points in stft-spectrogram: {stft.shape[0]*stft.shape[1]}')
-print(f'-> Data Reduction by factor: \
-      {(stft.shape[0]*stft.shape[1]) / (melspec.shape[0]*melspec.shape[1])}')
+print(f'-> Data Reduction by factor: {(stft.shape[0]*stft.shape[1]) / (melspec.shape[0]*melspec.shape[1])}')
 
 
-# %% Prepare dataset
+# %%
 # Split dataset in 80:20 (test:train)
-buff_size = len(dataset)
-train_size = int(.8*buff_size)
-test_size = buff_size - train_size
+buff_size: int = len(dataset)
+train_size: int = int(.8*buff_size)
+test_size: int = buff_size - train_size
 # shuffle before splitting in train and eval dataset
 dataset = dataset.shuffle(buffer_size=buff_size)
 dataset = dataset.cache()
@@ -166,6 +182,7 @@ train_dataset = train_dataset.prefetch(AUTOTUNE)
 test_dataset = dataset.skip(test_size).shuffle(test_size)
 test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
 eval_dataset = test_dataset
+
 
 # %%
 # create model architecture
@@ -202,6 +219,7 @@ model.compile(optimizer='adam',
 history = model.fit(train_dataset, epochs=n_epochs,
                     validation_data=eval_dataset)
 
+
 # %%
 # setup plot
 fig, ax = plt.subplots(nrows=1, ncols=2,figsize=(16,4))
@@ -223,6 +241,4 @@ for a in ax:
     a.set_xlabel('num of Epochs')
 plt.show()
 
-# %%
 
-# %%
