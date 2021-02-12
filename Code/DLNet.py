@@ -6,43 +6,58 @@ import numpy as np
 import librosa
 from librosa import display
 import matplotlib.pyplot as plt
-from DLNet_functions import preprocess_wrapper
+from DLNet_functions import PreprocessWrapper
 import tensorflow as tf
+from time import strftime
 assert tf.__version__ >= "2.0"
 # autotune computation
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
-
 # %%
 # Create Config for preprocessing and pipeline parameters
 
-config = {'sr': 44100,
-          'audio_length': 1,
-          'mono': True,
-          'n_mels': 64,
-          'n_fft': 1024,
-          'hop_length': 256,
-          'win_length': 512,
-          'window': 'hann',
-          'center': True,
-          'pad_mode': 'reflect',
-          'power': 2.0,
-          }
+# if true analysis is conducted with mel-spectrograms, if false with "full"
+# spectrograms
+CALCULATE_MEL = False
+
+config: {} = {'sr': 44100,
+              'audio_length': 1,
+              'mono': True,
+              'n_mels': 64,
+              'n_fft': 1024,
+              'hop_length': 256,
+              'win_length': 512,
+              'window': 'hann',
+              'center': True,
+              'pad_mode': 'reflect',
+              'power': 2.0,
+              'calculate_mel': CALCULATE_MEL,
+              'filter_signal': False
+              }
+
 
 # save number of frames from length in samples divided by fft hop length
-config['n_frames'] = int(
+config['n_frames']: int = int(
     config['sr']*config['audio_length']/config['hop_length']) + 1
 
 # save input shape for model
-config['input_shape'] = (config['n_mels'], config['n_frames'], 1)
+if CALCULATE_MEL:
+    config['input_shape']: (int, int, int) = (config['n_mels'],
+                                              config['n_frames'], 1)
+else:
+    config['input_shape']: (int, int, int) = (int(config['n_fft']/2 + 1),
+                                              config['n_frames'], 1)
 
+time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
 # save config
-with open('DLNet_config.json', 'w+') as fp:
+with open(f'DLNet_config_{strftime("%d_%m_%Y_%H_%M")}.json', 'w') as fp:
     json.dump(config, fp, sort_keys=True, indent=4)
 
 # Creater wrapper object:
-ds_config = 'dl4aed_project/Code/_data/dataset_config.json'
-wrapper = preprocess_wrapper(config, ds_config)
+ds_config: str = f'dl4aed_project/Code/_data/dataset_config{time_stamp}.json'
+wrapper: PreprocessWrapper = PreprocessWrapper(config, ds_config)
+
+
 # %%
 # Create dataset from MedleyDB
 train_aac, test_aac = wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/ogg_vbr')
@@ -141,6 +156,7 @@ eval_size = int(.1*train_size)
 
 # Shuffel train data:
 train_dataset = train_dataset.shuffle(buffer_size=train_size)
+
 # Split train into train and eval set:
 eval_dataset = train_dataset.take(eval_size)
 eval_dataset = eval_dataset.batch(64).prefetch(AUTOTUNE)
@@ -153,7 +169,6 @@ train_dataset = train_dataset.prefetch(AUTOTUNE)
 
 # Prepare test dataset
 test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
-
 
 # %%
 # create model architecture
