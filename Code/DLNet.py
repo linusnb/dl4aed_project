@@ -42,9 +42,11 @@ config['n_frames']: int = int(
 
 # save input shape for model
 if CALCULATE_MEL:
-    config['input_shape']: (int, int, int) = (config['n_mels'], config['n_frames'], 1)
+    config['input_shape']: (int, int, int) = (config['n_mels'],
+                                              config['n_frames'], 1)
 else:
-    config['input_shape']: (int, int, int) = (int(config['n_fft']/2 + 1), config['n_frames'], 1)
+    config['input_shape']: (int, int, int) = (int(config['n_fft']/2 + 1),
+                                              config['n_frames'], 1)
 
 time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
 # save config

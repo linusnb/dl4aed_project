@@ -112,8 +112,9 @@ class PreprocessWrapper:
 
         if self._config['calculate_mel']:
             # filter stft with mel-filter
-            spectrogram = self._mel_filter.dot(np.abs(spectrogram).astype(np.float32) **
-                                               self._config['power'])
+            spectrogram = self._mel_filter.dot(np.abs(
+                                    spectrogram).astype(np.float32) **
+                                    self._config['power'])
 
         # add channel dimension for conv layer compatibility
         spectrogram = np.expand_dims(spectrogram, axis=-1)
@@ -170,7 +171,7 @@ class PreprocessWrapper:
         for train in train_list[1:]:
             # define a dataset of file paths
             train_set = train_set.concatenate(tf.data.Dataset.list_files(
-                                train))
+                                            train))
         # Test set
         test_set = tf.data.Dataset.list_files(test_list[0])
         for test in test_list[1:]:
@@ -301,3 +302,7 @@ class PreprocessWrapper:
             # Replace 'db_format' by 'uncompr_wav' and return
             return ['uncompr_wav' if i == 'db_format' else i for i in
                     codec_list]
+
+    @property
+    def classes(self):
+        return self._config['classes']
