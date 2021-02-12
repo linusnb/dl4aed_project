@@ -1,8 +1,8 @@
 from pathlib import Path
 import os
 import tensorflow as tf
-from librosa import filters
-from librosa import core
+from librosa import filters, core
+from scipy import signal
 import numpy as np
 import json
 
@@ -88,29 +88,35 @@ class Preprocess_wrapper:
                          mono=self._config['mono'], dtype=np.float32,
                          res_type='kaiser_best')
 
+        if self._config['filter_signal']:
+            sos = signal.butter(10,
+                                self._config['filter_config'][1],
+                                self._config['filter_config'][0],
+                                fs=self._config['sr'],
+                                output='sos')
+            y = signal.sosfilt(sos, y)
+
         # calculate stft from audio data
-        stft = core.stft(y, n_fft=self._config['n_fft'],
-                         hop_length=self._config['hop_length'],
-                         win_length=self._config['win_length'],
-                         window=self._config['window'],
-                         center=self._config['center'],
-                         dtype=np.complex64,
-                         pad_mode=self._config['pad_mode'])
+        spectrogram = core.stft(y, n_fft=self._config['n_fft'],
+                                hop_length=self._config['hop_length'],
+                                win_length=self._config['win_length'],
+                                window=self._config['window'],
+                                center=self._config['center'],
+                                dtype=np.complex64,
+                                pad_mode=self._config['pad_mode'])
 
         # get ground truth from file_path string
         one_hot = self.folder_name_to_one_hot(file_path)
 
         if self._config['calculate_mel']:
             # filter stft with mel-filter
-            mel_spec = self._mel_filter.dot(
-                np.abs(stft).astype(np.float32) ** self._config['power'])
+            spectrogram = self._mel_filter.dot(np.abs(spectrogram).astype(np.float32) **
+                                               self._config['power'])
 
             # add channel dimension for conv layer compatibility
-            mel_spec = np.expand_dims(mel_spec, axis=-1)
+            spectrogram = np.expand_dims(spectrogram, axis=-1)
 
-            return mel_spec, one_hot
-
-        return stft, one_hot
+        return spectrogram, one_hot
 
     def preprocessing_wrapper(self, file_path: str):
         """
