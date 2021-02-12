@@ -216,7 +216,6 @@ class preprocess_wrapper:
             test_set.concatenate(test)
         return train_set, test_set
 
-    @staticmethod
     def get_train_test_lists(self, codec_dir: str, train_test_ratio=.8):
         """
         Returns two lists of subfolders in codec_dir for train and test
