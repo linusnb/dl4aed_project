@@ -29,11 +29,6 @@ config = {'sr': 44100,
           'power': 2.0,
           }
 
-# save classes from foldernames
-# folders = glob.glob('_data/*_wav/')
-# config['classes'] = sorted(set([Path(f).parts[-1] for f in folders]))
-config['classes'] = ['compressed_wav', 'uncompr_wav']
-
 # save number of frames from length in samples divided by fft hop length
 config['n_frames'] = int(
     config['sr']*config['audio_length']/config['hop_length']) + 1
@@ -222,7 +217,5 @@ for a in ax:
     a.legend(['train','val'], loc=4)
     a.set_xlabel('num of Epochs')
 plt.show()
-
-# %%
 
 # %%
