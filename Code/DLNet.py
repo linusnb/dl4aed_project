@@ -68,7 +68,7 @@ train_dataset = train_wav.concatenate(train_aac)
 # %%
 # VISUALIZE WAVEFORMS
 # get all wav files
-fps = glob.glob('_data/*_wav/**/*.wav', recursive=True)
+fps = glob.glob('_data/MedleyDB/*_wav/**/*.wav', recursive=True)
 fps_random = []
 np.random.seed(9)
 
@@ -79,7 +79,7 @@ fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 6))
 # plot some audio waveforms
 for r in range(nrows):
     for c in range(ncols):
-        fp_random = fps[np.random.randint(len(fps))]
+        fp_random = fps[np.random.randint(0, len(fps))]
         audio, sr = librosa.core.load(fp_random, sr=None)
         ax[r][c].plot(audio, c='k')
         # ax[r][c].axis('off')

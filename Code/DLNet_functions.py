@@ -99,22 +99,22 @@ class PreprocessWrapper:
             y = signal.sosfilt(sos, y)
 
         # calculate stft from audio data
-        spectrogram = core.stft(y, n_fft=self._config['n_fft'],
-                                hop_length=self._config['hop_length'],
-                                win_length=self._config['win_length'],
-                                window=self._config['window'],
-                                center=self._config['center'],
-                                dtype=np.complex64,
-                                pad_mode=self._config['pad_mode'])
+        spectrogram = np.abs(core.stft(y, n_fft=self._config['n_fft'],
+                                       hop_length=self._config['hop_length'],
+                                       win_length=self._config['win_length'],
+                                       window=self._config['window'],
+                                       center=self._config['center'],
+                                       dtype=np.complex64,
+                                       pad_mode=self._config['pad_mode'])
+                             ).astype(np.float32)
 
         # get ground truth from file_path string
         one_hot = self.folder_name_to_one_hot(file_path)
 
         if self._config['calculate_mel']:
             # filter stft with mel-filter
-            spectrogram = self._mel_filter.dot(np.abs(
-                                    spectrogram).astype(np.float32) **
-                                    self._config['power'])
+            spectrogram = self._mel_filter.dot(spectrogram **
+                                               self._config['power'])
 
         # add channel dimension for conv layer compatibility
         spectrogram = np.expand_dims(spectrogram, axis=-1)
