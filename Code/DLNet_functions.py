@@ -291,3 +291,7 @@ class preprocess_wrapper:
             # Replace 'db_format' by 'uncompr_wav' and return
             return ['uncompr_wav' if i == 'db_format' else i for i in
                     codec_list]
+    
+    @property
+    def classes(self):
+        return self._config['classes']
