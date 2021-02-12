@@ -159,12 +159,13 @@ class preprocess_wrapper:
         train_set = tf.data.Dataset.list_files(train_list[0])
         for train in train_list[1:]:
             # define a dataset of file paths
-            train_set.concatenate(tf.data.Dataset.list_files(train))
+            train_set = train_set.concatenate(tf.data.Dataset.list_files(
+                                            train))
         # Test set
         test_set = tf.data.Dataset.list_files(test_list[0])
         for test in test_list[1:]:
             # define a dataset of file paths
-            test_set.concatenate(tf.data.Dataset.list_files(test))
+            test_set = test_set.concatenate(tf.data.Dataset.list_files(test))
         # Preprocessing via map
         train_set = train_set.map(self.preprocessing_wrapper,
                                   num_parallel_calls=AUTOTUNE)
@@ -236,7 +237,7 @@ class preprocess_wrapper:
         # Number of subfolders:
         n_folders = len(glob.glob(os.path.join(codec_dir, '**')))
         # Seed list
-        seeds = list(range(1, n_folders+1))
+        seeds = list(range(1, n_folders))
         # Train and test indices:
         train_idx = random.sample(seeds, int(train_test_ratio*n_folders))
         test_idx = list(set(seeds)-set(train_idx))

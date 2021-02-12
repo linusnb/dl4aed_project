@@ -44,19 +44,11 @@ with open('DLNet_config.json', 'w+') as fp:
 ds_config = 'dl4aed_project/Code/_data/dataset_config.json'
 wrapper = preprocess_wrapper(config, ds_config)
 # %%
-# Generate datasets (true) or load datasets (false):
-generate = True
-if generate:
-    # Generate mp3_32k dataset and uncompressed wav dataset from dirs
-    # this dataset will not be saved!
-    dirs = ['_data/compressed_wav/mp3_32k',
-            '_data/uncompr_wav']
-    dataset = wrapper.gen_tf_dataset_from_list(dirs)
-else:
-    # Load dataset:
-    dataset_1 = wrapper.load_tf_dataset('_data/dataset_mp3_32k')
-    dataset_2 = wrapper.load_tf_dataset('_data/dataset_uncompr_wav')
-    dataset = dataset_2.concatenate(dataset_1)
+# Create dataset from MedleyDB
+train_aac, test_aac = wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/ogg_vbr')
+train_wav, test_wav = wrapper.tf_dataset_from_codec('_data/MedleyDB/uncompr_wav')
+test_dataset = test_wav.concatenate(test_aac)
+train_dataset = train_wav.concatenate(train_aac)
 
 # %%
 # VISUALIZE WAVEFORMS
@@ -143,24 +135,25 @@ print(f'-> Data Reduction by factor: \
 
 
 # %% Prepare dataset
-# Split dataset in 80:20 (test:train)
-buff_size = len(dataset)
-train_size = int(.8*buff_size)
-test_size = buff_size - train_size
-# shuffle before splitting in train and eval dataset
-dataset = dataset.shuffle(buffer_size=buff_size)
-dataset = dataset.cache()
+train_size = len(train_dataset)
+test_size = len(test_dataset)
+eval_size = int(.1*train_size)
 
-# take first 80% from dataset
-train_dataset = dataset.take(train_size)
+# Shuffel train data:
 train_dataset = train_dataset.shuffle(buffer_size=train_size)
+# Split train into train and eval set:
+eval_dataset = train_dataset.take(eval_size)
+eval_dataset = eval_dataset.batch(64).prefetch(AUTOTUNE)
+
+# Train dataset
+train_dataset = train_dataset.skip(eval_size)
+train_dataset = train_dataset.shuffle(train_size - eval_size)
 train_dataset = train_dataset.batch(64)
 train_dataset = train_dataset.prefetch(AUTOTUNE)
 
-# take last 20% samples from dataset
-test_dataset = dataset.skip(test_size).shuffle(test_size)
+# Prepare test dataset
 test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
-eval_dataset = test_dataset
+
 
 # %%
 # create model architecture
