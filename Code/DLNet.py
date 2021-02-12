@@ -6,8 +6,9 @@ import numpy as np
 import librosa
 from librosa import display
 import matplotlib.pyplot as plt
-from DLNet_functions import preprocess_wrapper
+from DLNet_functions import PreprocessWrapper
 import tensorflow as tf
+from time import strftime
 assert tf.__version__ >= "2.0"
 # autotune computation
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -15,47 +16,51 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 # %%
 # Create Config for preprocessing and pipeline parameters
 
-config = {'sr': 44100,
-          'audio_length': 1,
-          'mono': True,
-          'n_mels': 64,
-          'n_fft': 1024,
-          'hop_length': 256,
-          'win_length': 512,
-          'window': 'hann',
-          'center': True,
-          'pad_mode': 'reflect',
-          'power': 2.0,
-          }
+# if true analysis is conducted with mel-spectrograms, if false with "full"
+# spectrograms
+CALCULATE_MEL = True
+
+config: {} = {'sr': 44100,
+              'audio_length': 1,
+              'mono': True,
+              'n_mels': 64,
+              'n_fft': 1024,
+              'hop_length': 256,
+              'win_length': 512,
+              'window': 'hann',
+              'center': True,
+              'pad_mode': 'reflect',
+              'power': 2.0,
+              'calculate_mel': CALCULATE_MEL
+              }
+
 
 # save number of frames from length in samples divided by fft hop length
-config['n_frames'] = int(
+config['n_frames']: int = int(
     config['sr']*config['audio_length']/config['hop_length']) + 1
 
 # save input shape for model
-config['input_shape'] = (config['n_mels'], config['n_frames'], 1)
+if CALCULATE_MEL:
+    config['input_shape']: (int, int, int) = (config['n_mels'], config['n_frames'], 1)
+else:
+    config['input_shape']: (int, int, int) = (config['n_fft'], config['n_frames'], 1)
 
+time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
 # save config
-with open('DLNet_config.json', 'w+') as fp:
+with open(f'DLNet_config_{strftime("%d_%m_%Y_%H_%M")}.json', 'w') as fp:
     json.dump(config, fp, sort_keys=True, indent=4)
 
 # Creater wrapper object:
-ds_config = 'dl4aed_project/Code/_data/dataset_config.json'
-wrapper = preprocess_wrapper(config, ds_config)
+ds_config: str = f'dl4aed_project/Code/_data/dataset_config{time_stamp}.json'
+wrapper: PreprocessWrapper = PreprocessWrapper(config, ds_config)
+
+
 # %%
-# Generate datasets (true) or load datasets (false):
-generate = True
-if generate:
-    # Generate mp3_32k dataset and uncompressed wav dataset from dirs
-    # this dataset will not be saved!
-    dirs = ['_data/compressed_wav/mp3_32k',
-            '_data/uncompr_wav']
-    dataset = wrapper.gen_tf_dataset_from_list(dirs)
-else:
-    # Load dataset:
-    dataset_1 = wrapper.load_tf_dataset('_data/dataset_mp3_32k')
-    dataset_2 = wrapper.load_tf_dataset('_data/dataset_uncompr_wav')
-    dataset = dataset_2.concatenate(dataset_1)
+# Create dataset from MedleyDB
+train_aac, test_aac = wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/ogg_vbr')
+train_wav, test_wav = wrapper.tf_dataset_from_codec('_data/MedleyDB/uncompr_wav')
+test_dataset = test_wav.concatenate(test_aac)
+train_dataset = train_wav.concatenate(train_aac)
 
 # %%
 # VISUALIZE WAVEFORMS
@@ -142,24 +147,25 @@ print(f'-> Data Reduction by factor: \
 
 
 # %% Prepare dataset
-# Split dataset in 80:20 (test:train)
-buff_size = len(dataset)
-train_size = int(.8*buff_size)
-test_size = buff_size - train_size
-# shuffle before splitting in train and eval dataset
-dataset = dataset.shuffle(buffer_size=buff_size)
-dataset = dataset.cache()
+train_size = len(train_dataset)
+test_size = len(test_dataset)
+eval_size = int(.1*train_size)
 
-# take first 80% from dataset
-train_dataset = dataset.take(train_size)
+# Shuffel train data:
 train_dataset = train_dataset.shuffle(buffer_size=train_size)
+
+# Split train into train and eval set:
+eval_dataset = train_dataset.take(eval_size)
+eval_dataset = eval_dataset.batch(64).prefetch(AUTOTUNE)
+
+# Train dataset
+train_dataset = train_dataset.skip(eval_size)
+train_dataset = train_dataset.shuffle(train_size - eval_size)
 train_dataset = train_dataset.batch(64)
 train_dataset = train_dataset.prefetch(AUTOTUNE)
 
-# take last 20% samples from dataset
-test_dataset = dataset.skip(test_size).shuffle(test_size)
+# Prepare test dataset
 test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
-eval_dataset = test_dataset
 
 # %%
 # create model architecture
