@@ -1,10 +1,6 @@
 {
     "audio_length": 1,
     "center": true,
-    "classes": [
-        "compressed_wav",
-        "uncompr_wav"
-    ],
     "hop_length": 256,
     "input_shape": [
         64,

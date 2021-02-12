@@ -5,6 +5,8 @@ from librosa import filters
 from librosa import core
 import numpy as np
 import json
+import glob
+import random
 
 
 class preprocess_wrapper:
@@ -130,72 +132,120 @@ class preprocess_wrapper:
         one_hot = tf.ensure_shape(one_hot, len(self._config['classes']))
         return mel_spec, one_hot
 
-    def gen_tf_dataset(self, directory: str, save=False):
+    def tf_dataset_from_codec(self, codec_dir, train_test_ratio=.8,
+                              save=False):
         """
-        Takes a path to a directory with samples to create a tensorflow
-        dataset.
+        Generate a tensorflow dataset from the codec directory.
 
         Parameters
         ----------
-        directory : str
-            Path to directory
+        codec_dir : str
+            Path to codec directory in database directory
+        train_test_ratio : float, optional
+            Ratio between test and train set, by default .8
         save : bool, optional
-            Set to True if datset should be saved, by default False
+            Save database to disk, by default False
 
         Returns
         -------
-        tensorflow.data.Dataset
-            Dataset
+        tuple, tensorflow.data.Dataset
+            Two tensowrflow datasets: Train, Test
         """
         # autotune computation
         AUTOTUNE = tf.data.experimental.AUTOTUNE
-        # define a dataset of file paths
-        dataset = tf.data.Dataset.list_files(os.path.join(directory, '*.wav'))
-        # run the preprocessing via map
-        dataset = dataset.map(self.preprocessing_wrapper,
-                              num_parallel_calls=AUTOTUNE)
+        train_list, test_list = self.get_train_test_lists(codec_dir,
+                                                          train_test_ratio)
+        # Train set
+        train_set = tf.data.Dataset.list_files(train_list[0])
+        for train in train_list[1:]:
+            # define a dataset of file paths
+            train_set.concatenate(tf.data.Dataset.list_files(train))
+        # Test set
+        test_set = tf.data.Dataset.list_files(test_list[0])
+        for test in test_list[1:]:
+            # define a dataset of file paths
+            test_set.concatenate(tf.data.Dataset.list_files(test))
+        # Preprocessing via map
+        train_set = train_set.map(self.preprocessing_wrapper,
+                                  num_parallel_calls=AUTOTUNE)
+        test_set = test_set.map(self.preprocessing_wrapper,
+                                num_parallel_calls=AUTOTUNE)
         if save:
             # save dataset to disk
-            name = 'dataset_'+os.path.split(directory)[1]
-            path = os.path.join('_data', name)
-            tf.data.experimental.save(dataset=dataset,
-                                      path=path,
+            train_name = 'train_set_'+os.path.split(codec_dir)[1]
+            train_path = os.path.join('_data', train_name)
+            test_name = 'test_set_'+os.path.split(codec_dir)[1]
+            test_path = os.path.join('_data', test_name)
+            tf.data.experimental.save(dataset=train_set,
+                                      path=train_path,
                                       compression='GZIP')
-        return dataset
+            tf.data.experimental.save(dataset=test_set,
+                                      path=test_path,
+                                      compression='GZIP')
+        return train_set, test_set
 
-    def gen_tf_dataset_from_list(self, dirs: list, save=False, ds_name=None):
+    def tf_dataset_from_database(self, db_path: str, train_test_ratio=.8,
+                                 save=False):
         """
-        Takes a list of directories with samples to create a tensorflow
-        dataset.
+        Generate a tensorflow dataset from the database directory with all
+        subfolders(codecs) included.
 
         Parameters
         ----------
-        directory : list
-            List of directories
-        save : boolean
-        Set to True if datset should be saved, by default False.
-        ds_name : str
-            Name of dataset
+        db_path : str
+            Path to database directory.
+        train_test_ratio : float, optional
+            Ratio between test and train set, by default .8
+        save : bool, optional
+            Save database to disk, by default False
 
         Returns
         -------
-        tensorflow.data.Dataset
-            Dataset
+        tuple, tensorflow.data.Dataset
+            Two tensowrflow datasets: Train, Test
         """
-        if save and not ds_name:
-            raise ValueError("Name must be given, if dataset is saved.")
-        dataset = self.gen_tf_dataset(dirs[0])
-        # For list of dirs:
-        for dir in dirs[1:]:
-            dataset = dataset.concatenate(self.gen_tf_dataset(dir))
-        # Save
-        if save:
-            name = 'dataset_'+ds_name
-            path = os.path.join('_data', name)
-            tf.data.experimental.save(dataset=dataset,
-                                    path=path,
-                                    compression='GZIP')
-        return dataset
+        # Get codec dirs:
+        codecs = glob.glob(os.path.join(db_path, 'compressed_wav', '**'))
+        codecs.append(os.path.join(db_path, 'uncompr_wav'))
+        # Loop over codecs:
+        train_set, test_set = self.tf_dataset_from_codec(codecs[0],
+                                                         train_test_ratio)
+        for codec in codecs:
+            train, test = self.tf_dataset_from_codec(codec, train_test_ratio)
+            train_set.concatenate(train)
+            test_set.concatenate(test)
+        return train_set, test_set
+
+    def get_train_test_lists(self, codec_dir: str, train_test_ratio=.8):
+        """
+        Returns two lists of subfolders in codec_dir for train and test
+        directories.
+
+        Parameters
+        ----------
+        codec_dir : str
+            Path to codec directory in database directory
+        train_test_ratio : float, optional
+            Ratio between test and train set, by default .8
+
+        Returns
+        -------
+        tuple, list
+            Two list for train and test file directories.
+        """
+        # Number of subfolders:
+        n_folders = len(glob.glob(os.path.join(codec_dir, '**')))
+        # Seed list
+        seeds = list(range(1, n_folders+1))
+        # Train and test indices:
+        train_idx = random.sample(seeds, int(train_test_ratio*n_folders))
+        test_idx = list(set(seeds)-set(train_idx))
+        # Train list
+        train = [os.path.join(codec_dir, str(idx), '*.wav')
+                 for idx in train_idx]
+        # Test list
+        test = [os.path.join(codec_dir, str(idx), '*.wav') for idx in test_idx]
+        return train, test
 
     def load_tf_dataset(self, directory: str):
         """
