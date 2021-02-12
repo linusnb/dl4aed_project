@@ -18,7 +18,7 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 # if true analysis is conducted with mel-spectrograms, if false with "full"
 # spectrograms
-CALCULATE_MEL = True
+CALCULATE_MEL = False
 
 config: {} = {'sr': 44100,
               'audio_length': 1,
@@ -31,7 +31,8 @@ config: {} = {'sr': 44100,
               'center': True,
               'pad_mode': 'reflect',
               'power': 2.0,
-              'calculate_mel': CALCULATE_MEL
+              'calculate_mel': CALCULATE_MEL,
+              'filter_signal': False
               }
 
 
@@ -43,7 +44,7 @@ config['n_frames']: int = int(
 if CALCULATE_MEL:
     config['input_shape']: (int, int, int) = (config['n_mels'], config['n_frames'], 1)
 else:
-    config['input_shape']: (int, int, int) = (config['n_fft'], config['n_frames'], 1)
+    config['input_shape']: (int, int, int) = (int(config['n_fft']/2 + 1), config['n_frames'], 1)
 
 time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
 # save config

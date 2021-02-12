@@ -115,8 +115,8 @@ class PreprocessWrapper:
             spectrogram = self._mel_filter.dot(np.abs(spectrogram).astype(np.float32) **
                                                self._config['power'])
 
-            # add channel dimension for conv layer compatibility
-            spectrogram = np.expand_dims(spectrogram, axis=-1)
+        # add channel dimension for conv layer compatibility
+        spectrogram = np.expand_dims(spectrogram, axis=-1)
 
         return spectrogram, one_hot
 
