@@ -27,7 +27,7 @@ time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
 
 config: {} = {'time_stamp': time_stamp,
               'sr': 44100,
-              'audio_length': 1,
+              'audio_length': 10,
               'mono': True,
               'n_mels': 64,
               'n_fft': 1024,
@@ -67,8 +67,8 @@ wrapper: PreprocessWrapper = PreprocessWrapper(config, ds_config)
 
 # %%
 # Create dataset from MedleyDB
-train_aac, test_aac = wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/ogg_vbr')
-train_wav, test_wav = wrapper.tf_dataset_from_codec('_data/MedleyDB/uncompr_wav')
+train_aac, test_aac = wrapper.tf_dataset_from_codec('_data/MedleyDB_10s/compressed_wav/mp3_32k')
+train_wav, test_wav = wrapper.tf_dataset_from_codec('_data/MedleyDB_10s/uncompr_wav')
 test_dataset = test_wav.concatenate(test_aac)
 train_dataset = train_wav.concatenate(train_aac)
 
@@ -83,7 +83,7 @@ train_dataset = train_wav.concatenate(train_aac)
 # %%
 # VISUALIZE WAVEFORMS
 # get all wav files
-fps = glob.glob('_data/MedleyDB/compressed_wav/**/*.wav', recursive=True)
+fps = glob.glob('_data/MedleyDB_10s/compressed_wav/**/*.wav', recursive=True)
 fps_random = []
 
 # setup subplot
@@ -113,7 +113,7 @@ for i, file in enumerate(fps_random):
     spec_c, _ = wrapper.load_and_preprocess_data(file)
     path, name = os.path.split(file)
     _, folder = os.path.split(path)
-    uncompr_file = os.path.join(DATA_PATH, 'MedleyDB', 'uncompr_wav',
+    uncompr_file = os.path.join(DATA_PATH, 'MedleyDB_10s', 'uncompr_wav',
                                 folder, name)
     uncompr_file_path[i] = uncompr_file
     spec_uc, _ = wrapper.load_and_preprocess_data(uncompr_file)
@@ -217,8 +217,8 @@ test_dataset = test_dataset.batch(batch_size).prefetch(AUTOTUNE)
 
 # %%
 # Build model architecture
-MODEL_TYPE = ModelType.BASIC_CNN
-model_builder = ModelBuilder(MODEL_TYPE, config['input_shape'], 
+MODEL_TYPE = ModelType.HENNEQUIN
+model_builder = ModelBuilder(MODEL_TYPE, config['input_shape'],
                              config['classes'])
 model = model_builder.get_model()
 
@@ -242,7 +242,7 @@ model.compile(optimizer='adam',
 history = model.fit(train_dataset, epochs=n_epochs,
                     validation_data=eval_dataset)
 
-model.evaluate(test_dataset,batch_size=64)
+model.evaluate(test_dataset, batch_size=64)
 
 # %%
 # setup plot
@@ -261,7 +261,7 @@ ax[1].set_ylabel('accuracy'), ax[1].set_title('train_acc vs val_acc')
 # plot adjustement
 for a in ax:
     a.grid(True)
-    a.legend(['train','val'], loc=4)
+    a.legend(['train', 'val'], loc=4)
     a.set_xlabel('num of Epochs')
 plt.show()
 

@@ -123,7 +123,9 @@ class PreprocessWrapper:
         else:
             spectrogram = librosa.amplitude_to_db(np.abs(spectrogram),
                                                   ref=np.max)
-
+            spectrogram -= np.mean(spectrogram)
+            spectrogram /=np.std(spectrogram)
+            
         # add channel dimension for conv layer compatibility
         spectrogram = np.expand_dims(spectrogram, axis=-1)
 
