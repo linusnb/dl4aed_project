@@ -5,11 +5,8 @@ import os
 from itertools import cycle
 import sys
 #%%
-db = ds('_data/dataset_config.json', 'MedleyDB')
+db = ds('_data/dataset_config_10s.json', 'MedleyDB_10s')
 seed_path = os.path.join(db._seed_dir, '**/*.wav')
-
-
-
 
 # # %% Add ten tracks:
 # dict, total = db.get_stats()
@@ -30,7 +27,7 @@ seed_path = os.path.join(db._seed_dir, '**/*.wav')
 
 # %% 
 fps = glob.glob(seed_path, recursive=True)
-for file in fps:
+for file in fps[:50]:
     # Add item to this codec:
     db.add_item(file)
 dict, total = db.get_stats()
