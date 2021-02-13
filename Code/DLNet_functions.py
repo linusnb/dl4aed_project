@@ -27,10 +27,14 @@ class PreprocessWrapper:
             default True
         """
         self._config = dlnet_config
+        # Set random seed:
+        random.seed = self._config['random_seed']
+        # Classes
         if binary:
             self._config['classes'] = ['compressed_wav', 'uncompr_wav']
         else:
             self._config['classes'] = self.get_classes_from_dataset(ds_config)
+        # Mel filter init:
         if self._config['calculate_mel']:
             self._mel_filter = filters.mel(self._config['sr'],
                                            self._config['n_fft'],

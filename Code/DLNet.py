@@ -12,6 +12,7 @@ from time import strftime
 assert tf.__version__ >= "2.0"
 # autotune computation
 AUTOTUNE = tf.data.experimental.AUTOTUNE
+RANDOM_SEED = 10
 
 # %%
 # Create Config for preprocessing and pipeline parameters
@@ -32,7 +33,8 @@ config: {} = {'sr': 44100,
               'pad_mode': 'reflect',
               'power': 2.0,
               'calculate_mel': CALCULATE_MEL,
-              'filter_signal': False
+              'filter_signal': False,
+              'seed_filter': RANDOM_SEED
               }
 
 
@@ -196,7 +198,7 @@ metrics = [tf.keras.metrics.TrueNegatives(),
            ]
 
 # compile model
-n_epochs = 10
+n_epochs = 1
 model.compile(optimizer='adam',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
