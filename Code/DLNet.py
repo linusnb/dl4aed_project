@@ -8,6 +8,7 @@ import os
 from librosa import display
 import matplotlib.pyplot as plt
 from DLNet_functions import PreprocessWrapper
+from models import ModelType, ModelBuilder
 import tensorflow as tf
 from time import strftime
 assert tf.__version__ >= "2.0"
@@ -22,15 +23,17 @@ DATA_PATH = '_data'
 # if true analysis is conducted with mel-spectrograms, if false with "full"
 # spectrograms
 CALCULATE_MEL = False
+time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
 
-config: {} = {'sr': 44100,
+config: {} = {'time_stamp': time_stamp,
+              'sr': 44100,
               'audio_length': 1,
               'mono': True,
               'n_mels': 64,
               'n_fft': 1024,
               'hop_length': 256,
               'win_length': 512,
-              'window': 'hann',
+              'window': 'hamm',
               'center': True,
               'pad_mode': 'reflect',
               'power': 2.0,
@@ -52,13 +55,13 @@ else:
     config['input_shape']: (int, int, int) = (int(config['n_fft']/2 + 1),
                                               config['n_frames'], 1)
 
-time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
+
 # save config
-with open(f'DLNet_config_{strftime("%d_%m_%Y_%H_%M")}.json', 'w') as fp:
+with open('DLNet_config.json', 'a') as fp:
     json.dump(config, fp, sort_keys=True, indent=4)
 
 # Creater wrapper object:
-ds_config: str = f'dl4aed_project/Code/_data/dataset_config{time_stamp}.json'
+ds_config: str = 'dl4aed_project/Code/_data/dataset_config.json'
 wrapper: PreprocessWrapper = PreprocessWrapper(config, ds_config)
 
 
@@ -174,22 +177,23 @@ plt.show()
 train_size = len(train_dataset)
 test_size = len(test_dataset)
 eval_size = int(.1*train_size)
+batch_size = 64
 
 # Shuffel train data:
 train_dataset = train_dataset.shuffle(buffer_size=train_size)
 
 # Split train into train and eval set:
 eval_dataset = train_dataset.take(eval_size)
-eval_dataset = eval_dataset.batch(64).prefetch(AUTOTUNE)
+eval_dataset = eval_dataset.batch(batch_size).prefetch(AUTOTUNE)
 
 # Train dataset
 train_dataset = train_dataset.skip(eval_size)
 train_dataset = train_dataset.shuffle(train_size - eval_size)
-train_dataset = train_dataset.batch(64)
+train_dataset = train_dataset.batch(batch_size)
 train_dataset = train_dataset.prefetch(AUTOTUNE)
 
 # Prepare test dataset
-test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
+test_dataset = test_dataset.batch(batch_size).prefetch(AUTOTUNE)
 
 # # Split dataset in 80:20 (test:train)
 # buff_size: int = len(dataset)
@@ -212,19 +216,11 @@ test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
 
 
 # %%
-# create model architecture
-model = tf.keras.Sequential()
-model.add(tf.keras.Input(shape=config['input_shape']))
-model.add(tf.keras.layers.BatchNormalization())
-model.add(tf.keras.layers.Conv2D(32, (3, 3), activation="relu"))
-model.add(tf.keras.layers.MaxPool2D(pool_size=(2, 2)))
-model.add(tf.keras.layers.GaussianDropout(0.25))
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation="relu"))
-model.add(tf.keras.layers.MaxPool2D(pool_size=(2, 2)))
-model.add(tf.keras.layers.GaussianDropout(0.25))
-model.add(tf.keras.layers.Conv2D(128, (3, 3), activation="relu"))
-model.add(tf.keras.layers.GlobalMaxPool2D())
-model.add(tf.keras.layers.Dense(len(config['classes']), activation="sigmoid"))
+# Build model architecture
+MODEL_TYPE = ModelType.BASIC_CNN
+model_builder = ModelBuilder(MODEL_TYPE, config['input_shape'], 
+                             config['classes'])
+model = model_builder.get_model()
 
 # Define metrics
 metrics = [tf.keras.metrics.TrueNegatives(),
@@ -235,7 +231,7 @@ metrics = [tf.keras.metrics.TrueNegatives(),
            tf.keras.metrics.Recall(),
            tf.keras.metrics.CategoricalAccuracy()
            ]
-
+# %%
 # compile model
 n_epochs = 2
 model.compile(optimizer='adam',
@@ -250,7 +246,7 @@ model.evaluate(test_dataset,batch_size=64)
 
 # %%
 # setup plot
-fig, ax = plt.subplots(nrows=1, ncols=2,figsize=(16,4))
+fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(16, 4))
 
 # plot loss
 ax[0].plot(range(n_epochs), history.history['loss'])
