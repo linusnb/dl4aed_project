@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import tensorflow as tf
+import librosa
 from librosa import filters, core
 from scipy import signal
 import numpy as np
@@ -103,22 +104,25 @@ class PreprocessWrapper:
             y = signal.sosfilt(sos, y)
 
         # calculate stft from audio data
-        spectrogram = np.abs(core.stft(y, n_fft=self._config['n_fft'],
-                                       hop_length=self._config['hop_length'],
-                                       win_length=self._config['win_length'],
-                                       window=self._config['window'],
-                                       center=self._config['center'],
-                                       dtype=np.complex64,
-                                       pad_mode=self._config['pad_mode'])
-                             ).astype(np.float32)
+        spectrogram = core.stft(y, n_fft=self._config['n_fft'],
+                                hop_length=self._config['hop_length'],
+                                win_length=self._config['win_length'],
+                                window=self._config['window'],
+                                center=self._config['center'],
+                                dtype=np.complex64,
+                                pad_mode=self._config['pad_mode'])
 
         # get ground truth from file_path string
         one_hot = self.folder_name_to_one_hot(file_path)
 
         if self._config['calculate_mel']:
             # filter stft with mel-filter
-            spectrogram = self._mel_filter.dot(spectrogram **
+            spectrogram = self._mel_filter.dot(np.abs(spectrogram)
+                                               .astype(np.float32) **
                                                self._config['power'])
+        else:
+            spectrogram = librosa.amplitude_to_db(np.abs(spectrogram),
+                                                  ref=np.max)
 
         # add channel dimension for conv layer compatibility
         spectrogram = np.expand_dims(spectrogram, axis=-1)
@@ -252,7 +256,7 @@ class PreprocessWrapper:
         # Number of subfolders:
         n_folders = len(glob.glob(os.path.join(codec_dir, '**')))
         # Seed list
-        seeds = list(range(1, n_folders))
+        seeds = list(range(1, n_folders+1))
         # Train and test indices:
         train_idx = random.sample(seeds, int(train_test_ratio*n_folders))
         test_idx = list(set(seeds)-set(train_idx))
@@ -302,7 +306,7 @@ class PreprocessWrapper:
         with open(json_file, "r") as read_file:
             config = json.load(read_file)
             # Get list of codec settings:
-            codec_list = list(config.keys())[4:]
+            codec_list = list(config.keys())[5:]
             # Replace 'db_format' by 'uncompr_wav' and return
             return ['uncompr_wav' if i == 'db_format' else i for i in
                     codec_list]

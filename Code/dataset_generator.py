@@ -38,9 +38,11 @@ class Dataset:
                                        config['compressed_audio_path'])
         # Get chunk size
         self._chunk_size = config['segment_length']
+        # Get number of chunks
+        self._n_chunks = config['number of min chunks']
         # Get list of codec settings:
         self._key_list = list(config.keys())
-        self._codec_list = self._key_list[4:]
+        self._codec_list = self._key_list[5:]
         # Get dict with codec settings:
         self._codec_settings = {key: value for key, value in config.items()
                                 if key in self._codec_list}
@@ -98,7 +100,7 @@ class Dataset:
         filter = np.sqrt(np.mean(chunk_arr**2, axis=(1, 2))) > \
                         (.5*np.sqrt(np.mean(chunk_arr**2)))
         chunk_arr = chunk_arr[filter]
-        if chunk_arr.shape[0] > 50:
+        if chunk_arr.shape[0] > self._n_chunks:
             # Pick random 50 samples from filtert array:
             chunk_idx = set(np.arange(chunk_arr.shape[0]))
             samples_idx = random.sample(chunk_idx, 50)
@@ -112,7 +114,6 @@ class Dataset:
         out_file_path, _ = os.path.split(in_file_path)
         # Only return chunks with rms greater then half of average rms
         for idx, sample_idx in enumerate(samples_idx):
-            # n_file_name = f"{in_file_path}" + f"_c{idx+1}.wav"
             n_file_name = os.path.join(out_file_path, f"{idx+1}.wav")
             # Write wav file:
             sf.write(n_file_name, chunk_arr[sample_idx, :], samplerate,
@@ -155,19 +156,20 @@ class Dataset:
         is_split = False
         # Iterate over codec list:
         for codec in self._codec_list:
-            # Output path: dataset_name/compressed_wav/codec_name/seed_number
-            enc_output_path = os.path.join(self._compr_dir, codec,
-                                           str(n_seeds+1))
-            # If compressed output directory not existing -> make directory
-            if not os.path.isdir(enc_output_path):
-                os.makedirs(os.path.join(enc_output_path))
-            # Encodec output file path
-            enc_out_file = os.path.join(enc_output_path, in_f_name + '.' +
-                                        self._codec_settings[codec]
-                                        .get('format'))
             # Decoded output file path
             # Encode to codec_specifier
             if codec != 'uncompr_wav':
+                # Output path: dataset_name/compressed_wav/codec_name/
+                # seed_number
+                enc_output_path = os.path.join(self._compr_dir, codec,
+                                            str(n_seeds+1))
+                # If compressed output directory not existing -> make directory
+                if not os.path.isdir(enc_output_path):
+                    os.makedirs(os.path.join(enc_output_path))
+                # Encodec output file path
+                enc_out_file = os.path.join(enc_output_path, in_f_name + '.' +
+                                            self._codec_settings[codec]
+                                            .get('format'))
                 self.encode(input_file, enc_out_file, codec)
                 # decode to wav
                 dec_out_file = os.path.join(enc_output_path, in_f_name_wav)

@@ -4,6 +4,7 @@ import json
 import glob
 import numpy as np
 import librosa
+import os
 from librosa import display
 import matplotlib.pyplot as plt
 from DLNet_functions import PreprocessWrapper
@@ -14,6 +15,7 @@ assert tf.__version__ >= "2.0"
 # autotune computation
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 RANDOM_SEED = 10
+DATA_PATH = '_data'
 
 # %%
 # Create Config for preprocessing and pipeline parameters
@@ -70,12 +72,19 @@ train_wav, test_wav = wrapper.tf_dataset_from_codec('_data/MedleyDB/uncompr_wav'
 test_dataset = test_wav.concatenate(test_aac)
 train_dataset = train_wav.concatenate(train_aac)
 
+# train_data = '/home/linus/tubCloud/Documents/MedleyDB_temp_olf_version/compressed_wav/mp3_32k/*.wav'
+# more_data = '/home/linus/tubCloud/Documents/MedleyDB_temp_olf_version/uncompr_wav/*.wav'
+
+# dataset = tf.data.Dataset.list_files(train_data)
+# dataset = dataset.concatenate(tf.data.Dataset.list_files(more_data))
+# dataset = dataset.map(wrapper.preprocessing_wrapper,
+#                           num_parallel_calls=AUTOTUNE)                                
+
 # %%
 # VISUALIZE WAVEFORMS
 # get all wav files
-fps = glob.glob('_data/MedleyDB/*_wav/**/*.wav', recursive=True)
+fps = glob.glob('_data/MedleyDB/compressed_wav/**/*.wav', recursive=True)
 fps_random = []
-np.random.seed(9)
 
 # setup subplot
 nrows, ncols = 2, 2
@@ -97,62 +106,72 @@ for r in range(nrows):
 # %%
 # VISUALIZE SPECTROGRAMS
 # setup subplot
-nrows, ncols = 4, 2
-fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 12))
+specs_c = [None]*4
+specs_uc = [None]*4
+uncompr_file_path = [None]*4
+for i, file in enumerate(fps_random):
+    spec_c, _ = wrapper.load_and_preprocess_data(file)
+    path, name = os.path.split(file)
+    _, folder = os.path.split(path)
+    uncompr_file = os.path.join(DATA_PATH, 'MedleyDB', 'uncompr_wav',
+                                folder, name)
+    uncompr_file_path[i] = uncompr_file
+    spec_uc, _ = wrapper.load_and_preprocess_data(uncompr_file)
+    specs_c[i] = spec_c[:, :, 0]
+    specs_uc[i] = spec_uc[:, :, 0]
 
-# plot some audio waveforms
-for i, fp_random in enumerate(fps_random):
-    audio, sr = librosa.core.load(fp_random, sr=None)
-
-    # calculate stft
-    stft = librosa.stft(audio, n_fft=config['n_fft'],
-                        hop_length=config['hop_length'],
-                        win_length=config['win_length'])
-
-    # calculate melspec
-    melspec = librosa.feature.melspectrogram(audio, n_fft=config['n_fft'],
-                                             hop_length=config['hop_length'],
-                                             n_mels=config['n_mels'],
-                                             fmax=int(config['sr']/2))
-    melspec = librosa.amplitude_to_db(melspec, ref=np.max)
-
-    # calculate magnitude and scale to dB
-    magspec = librosa.amplitude_to_db(np.abs(stft), ref=np.max)
-
-    # plot with librosa
-    librosa.display.specshow(magspec, x_axis='time', y_axis='linear', sr=sr,
-                             hop_length=256, ax=ax[i][0])
-    librosa.display.specshow(melspec, x_axis='time', y_axis='mel', sr=sr,
-                             hop_length=256, ax=ax[i][1])
-
-    # adjustments
-    # ax[i][1].set_yticks([])
-    ax[i][1].set_ylabel(Path(fp_random).parts[-2], rotation=270, labelpad=20)
-    ax[i][1].yaxis.set_label_position("right")
-
-    # settings for all axises but bottom ones
-    if not i == len(fps_random) - 1:
-        ax[i][0].set_xticks([])
-        ax[i][1].set_xticks([])
-        ax[i][0].set_xlabel('')
-        ax[i][1].set_xlabel('')
-
-    # settings for upper axises
-    if i == 0:
-        ax[i][0].set_title('stft')
-        ax[i][1].set_title('mel spectrogram')
-
-# adjust whitespace in between subplots
-plt.subplots_adjust(hspace=0.1, wspace=0.1)
-
-print('Melspec shape: %s' % (str(melspec.shape)))
-print('Stft shape: %s' % (str(stft.shape)))
-print(f'Total data points in mel-spectrogram: \
-      {melspec.shape[0]*melspec.shape[1]}')
-print(f'Total data points in stft-spectrogram: {stft.shape[0]*stft.shape[1]}')
-print(f'-> Data Reduction by factor: \
-      {(stft.shape[0]*stft.shape[1]) / (melspec.shape[0]*melspec.shape[1])}')
-
+plt.figure(figsize=(15, 10))
+plt.subplot(4, 2, 1)
+librosa.display.specshow(specs_c[0], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(fps_random[0])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 2)
+librosa.display.specshow(specs_uc[0], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(uncompr_file_path[0])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 3)
+librosa.display.specshow(specs_c[1], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(fps_random[1])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 4)
+librosa.display.specshow(specs_uc[1], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(uncompr_file_path[1])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 5)
+librosa.display.specshow(specs_c[2], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(fps_random[2])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 6)
+librosa.display.specshow(specs_uc[2], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(uncompr_file_path[2])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 7)
+librosa.display.specshow(specs_c[3], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         x_axis='time',
+                         y_axis='log')
+plt.title(fps_random[3])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 8)
+librosa.display.specshow(specs_uc[3], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         x_axis='time',
+                         y_axis='log')
+plt.title(uncompr_file_path[3])
+plt.colorbar(format='%+2.0f dB')
+plt.show()
 
 # %% Prepare dataset
 train_size = len(train_dataset)
@@ -176,6 +195,26 @@ train_dataset = train_dataset.prefetch(AUTOTUNE)
 # Prepare test dataset
 test_dataset = test_dataset.batch(batch_size).prefetch(AUTOTUNE)
 
+# # Split dataset in 80:20 (test:train)
+# buff_size: int = len(dataset)
+# train_size: int = int(.8*buff_size)
+# test_size: int = buff_size - train_size
+# # shuffle before splitting in train and eval dataset
+# dataset = dataset.shuffle(buffer_size=buff_size)
+# dataset = dataset.cache()
+
+# # take first 80% from dataset
+# train_dataset = dataset.take(train_size)
+# train_dataset = train_dataset.shuffle(buffer_size=train_size)
+# train_dataset = train_dataset.batch(64)
+# train_dataset = train_dataset.prefetch(AUTOTUNE)
+
+# # take last 20% samples from dataset
+# test_dataset = dataset.skip(test_size).shuffle(test_size)
+# test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
+# eval_dataset = test_dataset
+
+
 # %%
 # Build model architecture
 MODEL_TYPE = ModelType.BASIC_CNN
@@ -194,14 +233,16 @@ metrics = [tf.keras.metrics.TrueNegatives(),
            ]
 # %%
 # compile model
-n_epochs = 20
-model.compile(optimizer='Adagrad',
-              loss='binary_crossentropy',
+n_epochs = 2
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
               metrics=['accuracy'])
 
 # fit model
 history = model.fit(train_dataset, epochs=n_epochs,
                     validation_data=eval_dataset)
+
+model.evaluate(test_dataset,batch_size=64)
 
 # %%
 # setup plot
