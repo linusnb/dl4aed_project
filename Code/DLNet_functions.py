@@ -302,7 +302,7 @@ class PreprocessWrapper:
         with open(json_file, "r") as read_file:
             config = json.load(read_file)
             # Get list of codec settings:
-            codec_list = list(config.keys())[4:]
+            codec_list = list(config.keys())[5:]
             # Replace 'db_format' by 'uncompr_wav' and return
             return ['uncompr_wav' if i == 'db_format' else i for i in
                     codec_list]
