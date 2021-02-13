@@ -20,8 +20,10 @@ RANDOM_SEED = 10
 # if true analysis is conducted with mel-spectrograms, if false with "full"
 # spectrograms
 CALCULATE_MEL = False
+time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
 
-config: {} = {'sr': 44100,
+config: {} = {'time_stamp': time_stamp,
+              'sr': 44100,
               'audio_length': 1,
               'mono': True,
               'n_mels': 64,
@@ -50,13 +52,13 @@ else:
     config['input_shape']: (int, int, int) = (int(config['n_fft']/2 + 1),
                                               config['n_frames'], 1)
 
-time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
+
 # save config
-with open(f'DLNet_config_{strftime("%d_%m_%Y_%H_%M")}.json', 'w') as fp:
+with open('DLNet_config.json', 'a') as fp:
     json.dump(config, fp, sort_keys=True, indent=4)
 
 # Creater wrapper object:
-ds_config: str = f'dl4aed_project/Code/_data/dataset_config{time_stamp}.json'
+ds_config: str = 'dl4aed_project/Code/_data/dataset_config.json'
 wrapper: PreprocessWrapper = PreprocessWrapper(config, ds_config)
 
 
