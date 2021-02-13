@@ -36,7 +36,7 @@ config: {} = {'time_stamp': time_stamp,
               'power': 2.0,
               'calculate_mel': CALCULATE_MEL,
               'filter_signal': False,
-              'seed_filter': RANDOM_SEED
+              'random_seed': RANDOM_SEED
               }
 
 
