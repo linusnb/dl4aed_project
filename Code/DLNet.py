@@ -21,7 +21,7 @@ DATA_PATH = '_data'
 
 # if true analysis is conducted with mel-spectrograms, if false with "full"
 # spectrograms
-CALCULATE_MEL = True
+CALCULATE_MEL = False
 
 config: {} = {'sr': 44100,
               'audio_length': 1,
@@ -69,6 +69,14 @@ train_wav, test_wav = wrapper.tf_dataset_from_codec('_data/MedleyDB/uncompr_wav'
 test_dataset = test_wav.concatenate(test_aac)
 train_dataset = train_wav.concatenate(train_aac)
 
+# train_data = '/home/linus/tubCloud/Documents/MedleyDB_temp_olf_version/compressed_wav/mp3_32k/*.wav'
+# more_data = '/home/linus/tubCloud/Documents/MedleyDB_temp_olf_version/uncompr_wav/*.wav'
+
+# dataset = tf.data.Dataset.list_files(train_data)
+# dataset = dataset.concatenate(tf.data.Dataset.list_files(more_data))
+# dataset = dataset.map(wrapper.preprocessing_wrapper,
+#                           num_parallel_calls=AUTOTUNE)                                
+
 # %%
 # VISUALIZE WAVEFORMS
 # get all wav files
@@ -106,8 +114,8 @@ for i, file in enumerate(fps_random):
                                 folder, name)
     uncompr_file_path[i] = uncompr_file
     spec_uc, _ = wrapper.load_and_preprocess_data(uncompr_file)
-    specs_c[i] = librosa.amplitude_to_db(spec_c[:, :, 0], ref=np.max)
-    specs_uc[i] = librosa.amplitude_to_db(spec_uc[:, :, 0], ref=np.max)
+    specs_c[i] = spec_c[:, :, 0]
+    specs_uc[i] = spec_uc[:, :, 0]
 
 plt.figure(figsize=(15, 10))
 plt.subplot(4, 2, 1)
@@ -183,6 +191,26 @@ train_dataset = train_dataset.prefetch(AUTOTUNE)
 # Prepare test dataset
 test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
 
+# # Split dataset in 80:20 (test:train)
+# buff_size: int = len(dataset)
+# train_size: int = int(.8*buff_size)
+# test_size: int = buff_size - train_size
+# # shuffle before splitting in train and eval dataset
+# dataset = dataset.shuffle(buffer_size=buff_size)
+# dataset = dataset.cache()
+
+# # take first 80% from dataset
+# train_dataset = dataset.take(train_size)
+# train_dataset = train_dataset.shuffle(buffer_size=train_size)
+# train_dataset = train_dataset.batch(64)
+# train_dataset = train_dataset.prefetch(AUTOTUNE)
+
+# # take last 20% samples from dataset
+# test_dataset = dataset.skip(test_size).shuffle(test_size)
+# test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
+# eval_dataset = test_dataset
+
+
 # %%
 # create model architecture
 model = tf.keras.Sequential()
@@ -209,7 +237,7 @@ metrics = [tf.keras.metrics.TrueNegatives(),
            ]
 
 # compile model
-n_epochs = 1
+n_epochs = 2
 model.compile(optimizer='adam',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
@@ -217,6 +245,8 @@ model.compile(optimizer='adam',
 # fit model
 history = model.fit(train_dataset, epochs=n_epochs,
                     validation_data=eval_dataset)
+
+model.evaluate(test_dataset,batch_size=64)
 
 # %%
 # setup plot
