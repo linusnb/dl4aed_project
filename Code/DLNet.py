@@ -7,6 +7,7 @@ import librosa
 from librosa import display
 import matplotlib.pyplot as plt
 from DLNet_functions import PreprocessWrapper
+from models import ModelType, ModelBuilder
 import tensorflow as tf
 from time import strftime
 assert tf.__version__ >= "2.0"
@@ -30,7 +31,7 @@ config: {} = {'time_stamp': time_stamp,
               'n_fft': 1024,
               'hop_length': 256,
               'win_length': 512,
-              'window': 'hann',
+              'window': 'hamm',
               'center': True,
               'pad_mode': 'reflect',
               'power': 2.0,
@@ -157,37 +158,30 @@ print(f'-> Data Reduction by factor: \
 train_size = len(train_dataset)
 test_size = len(test_dataset)
 eval_size = int(.1*train_size)
+batch_size = 64
 
 # Shuffel train data:
 train_dataset = train_dataset.shuffle(buffer_size=train_size)
 
 # Split train into train and eval set:
 eval_dataset = train_dataset.take(eval_size)
-eval_dataset = eval_dataset.batch(64).prefetch(AUTOTUNE)
+eval_dataset = eval_dataset.batch(batch_size).prefetch(AUTOTUNE)
 
 # Train dataset
 train_dataset = train_dataset.skip(eval_size)
 train_dataset = train_dataset.shuffle(train_size - eval_size)
-train_dataset = train_dataset.batch(64)
+train_dataset = train_dataset.batch(batch_size)
 train_dataset = train_dataset.prefetch(AUTOTUNE)
 
 # Prepare test dataset
-test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
+test_dataset = test_dataset.batch(batch_size).prefetch(AUTOTUNE)
 
 # %%
-# create model architecture
-model = tf.keras.Sequential()
-model.add(tf.keras.Input(shape=config['input_shape']))
-model.add(tf.keras.layers.BatchNormalization())
-model.add(tf.keras.layers.Conv2D(32, (3, 3), activation="relu"))
-model.add(tf.keras.layers.MaxPool2D(pool_size=(2, 2)))
-model.add(tf.keras.layers.GaussianDropout(0.25))
-model.add(tf.keras.layers.Conv2D(64, (3, 3), activation="relu"))
-model.add(tf.keras.layers.MaxPool2D(pool_size=(2, 2)))
-model.add(tf.keras.layers.GaussianDropout(0.25))
-model.add(tf.keras.layers.Conv2D(128, (3, 3), activation="relu"))
-model.add(tf.keras.layers.GlobalMaxPool2D())
-model.add(tf.keras.layers.Dense(len(config['classes']), activation="sigmoid"))
+# Build model architecture
+MODEL_TYPE = ModelType.BASIC_CNN
+model_builder = ModelBuilder(MODEL_TYPE, config['input_shape'], 
+                             config['classes'])
+model = model_builder.get_model()
 
 # Define metrics
 metrics = [tf.keras.metrics.TrueNegatives(),
@@ -198,11 +192,11 @@ metrics = [tf.keras.metrics.TrueNegatives(),
            tf.keras.metrics.Recall(),
            tf.keras.metrics.CategoricalAccuracy()
            ]
-
+# %%
 # compile model
-n_epochs = 1
-model.compile(optimizer='adam',
-              loss='categorical_crossentropy',
+n_epochs = 20
+model.compile(optimizer='Adagrad',
+              loss='binary_crossentropy',
               metrics=['accuracy'])
 
 # fit model
@@ -211,7 +205,7 @@ history = model.fit(train_dataset, epochs=n_epochs,
 
 # %%
 # setup plot
-fig, ax = plt.subplots(nrows=1, ncols=2,figsize=(16,4))
+fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(16, 4))
 
 # plot loss
 ax[0].plot(range(n_epochs), history.history['loss'])
