@@ -103,7 +103,7 @@ class Dataset:
         if chunk_arr.shape[0] > self._n_chunks:
             # Pick random 50 samples from filtert array:
             chunk_idx = set(np.arange(chunk_arr.shape[0]))
-            samples_idx = random.sample(chunk_idx, chunk_arr.shape[0])          # Change this back to 50!
+            samples_idx = random.sample(chunk_idx, 50)
         else:
             # Delete input file:
             os.remove(input)
@@ -114,7 +114,6 @@ class Dataset:
         out_file_path, _ = os.path.split(in_file_path)
         # Only return chunks with rms greater then half of average rms
         for idx, sample_idx in enumerate(samples_idx):
-            # n_file_name = f"{in_file_path}" + f"_c{idx+1}.wav"
             n_file_name = os.path.join(out_file_path, f"{idx+1}.wav")
             # Write wav file:
             sf.write(n_file_name, chunk_arr[sample_idx, :], samplerate,

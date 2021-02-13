@@ -53,7 +53,7 @@ def test_split_audio(db, datapath):
 
 
 def test_add_item(db, datapath):
-    new_file = os.path.join(datapath, 'new_ds', 'seed_files', 'test.wav')
+    new_file = os.path.join(datapath, 'new_ds', 'seed_files', 'new_test_file.wav')
     expt_new_file = os.path.join(datapath, 'new_ds', '**', '4', '*.wav')
     db.add_item(new_file)
     fps = glob.glob(expt_new_file, recursive=True)
