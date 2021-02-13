@@ -4,6 +4,7 @@ import json
 import glob
 import numpy as np
 import librosa
+import os
 from librosa import display
 import matplotlib.pyplot as plt
 from DLNet_functions import PreprocessWrapper
@@ -13,13 +14,14 @@ assert tf.__version__ >= "2.0"
 # autotune computation
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 RANDOM_SEED = 10
+DATA_PATH = '_data'
 
 # %%
 # Create Config for preprocessing and pipeline parameters
 
 # if true analysis is conducted with mel-spectrograms, if false with "full"
 # spectrograms
-CALCULATE_MEL = False
+CALCULATE_MEL = True
 
 config: {} = {'sr': 44100,
               'audio_length': 1,
@@ -70,9 +72,8 @@ train_dataset = train_wav.concatenate(train_aac)
 # %%
 # VISUALIZE WAVEFORMS
 # get all wav files
-fps = glob.glob('_data/MedleyDB/*_wav/**/*.wav', recursive=True)
+fps = glob.glob('_data/MedleyDB/compressed_wav/**/*.wav', recursive=True)
 fps_random = []
-np.random.seed(9)
 
 # setup subplot
 nrows, ncols = 2, 2
@@ -94,62 +95,72 @@ for r in range(nrows):
 # %%
 # VISUALIZE SPECTROGRAMS
 # setup subplot
-nrows, ncols = 4, 2
-fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 12))
+specs_c = [None]*4
+specs_uc = [None]*4
+uncompr_file_path = [None]*4
+for i, file in enumerate(fps_random):
+    spec_c, _ = wrapper.load_and_preprocess_data(file)
+    path, name = os.path.split(file)
+    _, folder = os.path.split(path)
+    uncompr_file = os.path.join(DATA_PATH, 'MedleyDB', 'uncompr_wav',
+                                folder, name)
+    uncompr_file_path[i] = uncompr_file
+    spec_uc, _ = wrapper.load_and_preprocess_data(uncompr_file)
+    specs_c[i] = librosa.amplitude_to_db(spec_c[:, :, 0], ref=np.max)
+    specs_uc[i] = librosa.amplitude_to_db(spec_uc[:, :, 0], ref=np.max)
 
-# plot some audio waveforms
-for i, fp_random in enumerate(fps_random):
-    audio, sr = librosa.core.load(fp_random, sr=None)
-
-    # calculate stft
-    stft = librosa.stft(audio, n_fft=config['n_fft'],
-                        hop_length=config['hop_length'],
-                        win_length=config['win_length'])
-
-    # calculate melspec
-    melspec = librosa.feature.melspectrogram(audio, n_fft=config['n_fft'],
-                                             hop_length=config['hop_length'],
-                                             n_mels=config['n_mels'],
-                                             fmax=int(config['sr']/2))
-    melspec = librosa.amplitude_to_db(melspec, ref=np.max)
-
-    # calculate magnitude and scale to dB
-    magspec = librosa.amplitude_to_db(np.abs(stft), ref=np.max)
-
-    # plot with librosa
-    librosa.display.specshow(magspec, x_axis='time', y_axis='linear', sr=sr,
-                             hop_length=256, ax=ax[i][0])
-    librosa.display.specshow(melspec, x_axis='time', y_axis='mel', sr=sr,
-                             hop_length=256, ax=ax[i][1])
-
-    # adjustments
-    # ax[i][1].set_yticks([])
-    ax[i][1].set_ylabel(Path(fp_random).parts[-2], rotation=270, labelpad=20)
-    ax[i][1].yaxis.set_label_position("right")
-
-    # settings for all axises but bottom ones
-    if not i == len(fps_random) - 1:
-        ax[i][0].set_xticks([])
-        ax[i][1].set_xticks([])
-        ax[i][0].set_xlabel('')
-        ax[i][1].set_xlabel('')
-
-    # settings for upper axises
-    if i == 0:
-        ax[i][0].set_title('stft')
-        ax[i][1].set_title('mel spectrogram')
-
-# adjust whitespace in between subplots
-plt.subplots_adjust(hspace=0.1, wspace=0.1)
-
-print('Melspec shape: %s' % (str(melspec.shape)))
-print('Stft shape: %s' % (str(stft.shape)))
-print(f'Total data points in mel-spectrogram: \
-      {melspec.shape[0]*melspec.shape[1]}')
-print(f'Total data points in stft-spectrogram: {stft.shape[0]*stft.shape[1]}')
-print(f'-> Data Reduction by factor: \
-      {(stft.shape[0]*stft.shape[1]) / (melspec.shape[0]*melspec.shape[1])}')
-
+plt.figure(figsize=(15, 10))
+plt.subplot(4, 2, 1)
+librosa.display.specshow(specs_c[0], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(fps_random[0])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 2)
+librosa.display.specshow(specs_uc[0], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(uncompr_file_path[0])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 3)
+librosa.display.specshow(specs_c[1], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(fps_random[1])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 4)
+librosa.display.specshow(specs_uc[1], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(uncompr_file_path[1])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 5)
+librosa.display.specshow(specs_c[2], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(fps_random[2])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 6)
+librosa.display.specshow(specs_uc[2], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         y_axis='log')
+plt.title(uncompr_file_path[2])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 7)
+librosa.display.specshow(specs_c[3], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         x_axis='time',
+                         y_axis='log')
+plt.title(fps_random[3])
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(4, 2, 8)
+librosa.display.specshow(specs_uc[3], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         x_axis='time',
+                         y_axis='log')
+plt.title(uncompr_file_path[3])
+plt.colorbar(format='%+2.0f dB')
+plt.show()
 
 # %% Prepare dataset
 train_size = len(train_dataset)
