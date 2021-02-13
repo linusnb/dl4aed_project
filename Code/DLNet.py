@@ -2,6 +2,7 @@
 from pathlib import Path
 import json
 import glob
+from re import VERBOSE
 import numpy as np
 import librosa
 import os
@@ -27,7 +28,7 @@ time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
 
 config: {} = {'time_stamp': time_stamp,
               'sr': 44100,
-              'audio_length': 10,
+              'audio_length': 1,
               'mono': True,
               'n_mels': 64,
               'n_fft': 1024,
@@ -61,16 +62,18 @@ with open('DLNet_config.json', 'a') as fp:
     json.dump(config, fp, sort_keys=True, indent=4)
 
 # Creater wrapper object:
-ds_config: str = 'dl4aed_project/Code/_data/dataset_config.json'
-wrapper: PreprocessWrapper = PreprocessWrapper(config, ds_config)
+ds_config: str = '_data/dataset_config.json'
+wrapper: PreprocessWrapper = PreprocessWrapper(config, ds_config, binary=False)
 
 
 # %%
 # Create dataset from MedleyDB
-train_aac, test_aac = wrapper.tf_dataset_from_codec('_data/MedleyDB_10s/compressed_wav/mp3_32k')
-train_wav, test_wav = wrapper.tf_dataset_from_codec('_data/MedleyDB_10s/uncompr_wav')
-test_dataset = test_wav.concatenate(test_aac)
-train_dataset = train_wav.concatenate(train_aac)
+# train_aac, test_aac = wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/mp3_320k')
+# train_wav, test_wav = wrapper.tf_dataset_from_codec('_data/MedleyDB/uncompr_wav')
+# test_dataset = test_wav.concatenate(test_aac)
+# train_dataset = train_wav.concatenate(train_aac)
+train_dataset, test_dataset = wrapper.tf_dataset_from_database(
+                                    os.path.join(DATA_PATH, 'MedleyDB'))
 
 # train_data = '/home/linus/tubCloud/Documents/MedleyDB_temp_olf_version/compressed_wav/mp3_32k/*.wav'
 # more_data = '/home/linus/tubCloud/Documents/MedleyDB_temp_olf_version/uncompr_wav/*.wav'
@@ -83,7 +86,7 @@ train_dataset = train_wav.concatenate(train_aac)
 # %%
 # VISUALIZE WAVEFORMS
 # get all wav files
-fps = glob.glob('_data/MedleyDB_10s/compressed_wav/**/*.wav', recursive=True)
+fps = glob.glob('_data/MedleyDB/compressed_wav/**/*.wav', recursive=True)
 fps_random = []
 
 # setup subplot
@@ -233,14 +236,14 @@ metrics = [tf.keras.metrics.TrueNegatives(),
            ]
 # %%
 # compile model
-n_epochs = 2
+n_epochs = 5
 model.compile(optimizer='adam',
-              loss='categorical_crossentropy',
+              loss='binary_crossentropy',
               metrics=['accuracy'])
 
 # fit model
 history = model.fit(train_dataset, epochs=n_epochs,
-                    validation_data=eval_dataset)
+                    validation_data=eval_dataset, verbose=1)
 
 model.evaluate(test_dataset, batch_size=64)
 

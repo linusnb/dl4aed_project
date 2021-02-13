@@ -124,8 +124,8 @@ class PreprocessWrapper:
             spectrogram = librosa.amplitude_to_db(np.abs(spectrogram),
                                                   ref=np.max)
             spectrogram -= np.mean(spectrogram)
-            spectrogram /=np.std(spectrogram)
-            
+            spectrogram /= np.std(spectrogram)
+
         # add channel dimension for conv layer compatibility
         spectrogram = np.expand_dims(spectrogram, axis=-1)
 
@@ -234,8 +234,8 @@ class PreprocessWrapper:
                                                          train_test_ratio)
         for codec in codecs:
             train, test = self.tf_dataset_from_codec(codec, train_test_ratio)
-            train_set.concatenate(train)
-            test_set.concatenate(test)
+            train_set = train_set.concatenate(train)
+            test_set = test_set.concatenate(test)
         return train_set, test_set
 
     def get_train_test_lists(self, codec_dir: str, train_test_ratio=.8):
