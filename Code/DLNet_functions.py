@@ -13,7 +13,7 @@ import random
 class PreprocessWrapper:
     """ Wrapper object for creating, reading and preprocessing datasets.
     """
-    def __init__(self, dlnet_config: dict, ds_config: str, binary=True):
+    def __init__(self, dlnet_config: dict, ds_config: str):
         """
         Init wrapper object. Reads DL Network config and dataset config.
 
@@ -23,15 +23,12 @@ class PreprocessWrapper:
             Config for DL Network and preprocessing
         ds_config : str
             Path to Dataset config to extract classes
-        binary : bool, optional
-            Set to True if for binary problem (compress/uncompressed), by
-            default True
         """
         self._config = dlnet_config
         # Set random seed:
         random.seed = self._config['random_seed']
         # Classes
-        if binary:
+        if self._config['binary']:
             self._config['classes'] = ['compressed_wav', 'uncompr_wav']
         else:
             self._config['classes'] = self.get_classes_from_dataset(ds_config)
@@ -193,17 +190,24 @@ class PreprocessWrapper:
         test_set = test_set.map(self.preprocessing_wrapper,
                                 num_parallel_calls=AUTOTUNE)
         if save:
+            folder_name = 'tf_dataset_' + os.path.split(codec_dir)[1]
+            folder_path = os.path.join('_data', folder_name)
+            if not os.path.isdir(folder_path):
+                os.makedirs(folder_path)
             # save dataset to disk
-            train_name = 'train_set_'+os.path.split(codec_dir)[1]
-            train_path = os.path.join('_data', train_name)
-            test_name = 'test_set_'+os.path.split(codec_dir)[1]
-            test_path = os.path.join('_data', test_name)
+            train_name = os.path.split(codec_dir)[1]+'_train_set'
+            train_path = os.path.join(folder_path, train_name)
+            test_name = os.path.split(codec_dir)[1]+'_test_set'
+            test_path = os.path.join(folder_path, test_name)
             tf.data.experimental.save(dataset=train_set,
                                       path=train_path,
                                       compression='GZIP')
             tf.data.experimental.save(dataset=test_set,
                                       path=test_path,
                                       compression='GZIP')
+            # Save the config to the folder:
+            with open(os.path.join(folder_path, 'DLNet_config.json'), 'w') as fp:
+                json.dump(self._config, fp, sort_keys=True, indent=4)
         return train_set, test_set
 
     def tf_dataset_from_database(self, db_path: str, train_test_ratio=.8,
@@ -236,6 +240,25 @@ class PreprocessWrapper:
             train, test = self.tf_dataset_from_codec(codec, train_test_ratio)
             train_set = train_set.concatenate(train)
             test_set = test_set.concatenate(test)
+        if save:
+            folder_name = 'tf_dataset_' + os.path.split(db_path)[1]
+            folder_path = os.path.join('_data', folder_name)
+            if not os.path.isdir(folder_path):
+                os.makedirs(folder_path)
+            # save dataset to disk
+            train_name = os.path.split(db_path)[1]+'_train_set'
+            train_path = os.path.join(folder_path, train_name)
+            test_name = os.path.split(db_path)[1]+'_test_set'
+            test_path = os.path.join(folder_path, test_name)
+            tf.data.experimental.save(dataset=train_set,
+                                      path=train_path,
+                                      compression='GZIP')
+            tf.data.experimental.save(dataset=test_set,
+                                      path=test_path,
+                                      compression='GZIP')
+                                      # Save the config to the folder:
+            with open(os.path.join(folder_path, 'DLNet_config.json'), 'w') as fp:
+                json.dump(self._config, fp, sort_keys=True, indent=4)
         return train_set, test_set
 
     def get_train_test_lists(self, codec_dir: str, train_test_ratio=.8):
