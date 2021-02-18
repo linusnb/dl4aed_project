@@ -24,20 +24,44 @@ class PreprocessWrapper:
         ds_config : str
             Path to Dataset config to extract classes
         """
-        self._config = dlnet_config
+        # Set config:
+        self.config = dlnet_config
+
         # Set random seed:
-        random.seed = self._config['random_seed']
+        random.seed = self.config['random_seed']
+
         # Classes
-        if self._config['binary']:
-            self._config['classes'] = ['compressed_wav', 'uncompr_wav']
+        if self.config['binary']:
+            self.config['classes'] = ['compressed_wav', 'uncompr_wav']
         else:
-            self._config['classes'] = self.get_classes_from_dataset(ds_config)
-        # Mel filter init:
-        if self._config['calculate_mel']:
-            self._mel_filter = filters.mel(self._config['sr'],
-                                           self._config['n_fft'],
+            self.config['classes'] = self.get_classes_from_dataset(ds_config)
+
+        # Input shape and filter settings:
+        if self.config['calculate_mel']:
+            # Mel filter init:
+            self._mel_filter = filters.mel(self.config['sr'],
+                                           self.config['n_fft'],
                                            n_mels=dlnet_config['n_mels'],
                                            norm='slaney')
+            self.config['input_shape'] = (self.config['n_mels'],
+                                          self.config['n_frames'],
+                                          1)
+        elif self.config['filter_signal']:
+            # Crop spectrogram
+            # frequency array
+            self._freqs = np.fft.rfftfreq(self.config['n_fft'],
+                                          d=1/self.config['sr'])
+            # cutoff frequency bin at cutoff frequency
+            self._cutoff_bin = int(np.argmin(np.abs(
+                self._freqs-self.config['filter_config'][1])))
+            self.config['input_shape'] = (int(
+                                        len(self._freqs) - self._cutoff_bin),
+                                          self.config['n_frames'],
+                                          1)
+        else:
+            self.config['input_shape'] = (int(self.config['n_fft']/2 + 1),
+                                          self.config['n_frames'],
+                                          1)
 
     # Groundtruth extraction from folder name
     def folder_name_to_one_hot(self, file_path: str):
@@ -60,10 +84,10 @@ class PreprocessWrapper:
         ValueError
             [description]
         """
-        for label_idx, label in enumerate(self._config['classes']):
+        for label_idx, label in enumerate(self.config['classes']):
             if label in Path(file_path).parts:
                 # get one hot encoded array
-                return tf.one_hot(label_idx, len(self._config['classes']),
+                return tf.one_hot(label_idx, len(self.config['classes']),
                                   dtype=tf.uint8)
         raise ValueError("Data cannot be labeled.")
 
@@ -88,36 +112,44 @@ class PreprocessWrapper:
             file_path = file_path.decode('utf-8')
 
         # load audio data
-        y, _ = core.load(file_path, sr=self._config['sr'],
-                         mono=self._config['mono'], dtype=np.float32,
+        y, _ = core.load(file_path, sr=self.config['sr'],
+                         mono=self.config['mono'], dtype=np.float32,
                          res_type='kaiser_best')
 
-        if self._config['filter_signal']:
+        if self.config['filter_signal']:
             sos = signal.butter(10,
-                                self._config['filter_config'][1],
-                                self._config['filter_config'][0],
-                                fs=self._config['sr'],
+                                self.config['filter_config'][1],
+                                self.config['filter_config'][0],
+                                fs=self.config['sr'],
                                 output='sos')
             y = signal.sosfilt(sos, y)
 
         # calculate stft from audio data
-        spectrogram = core.stft(y, n_fft=self._config['n_fft'],
-                                hop_length=self._config['hop_length'],
-                                win_length=self._config['win_length'],
-                                window=self._config['window'],
-                                center=self._config['center'],
+        spectrogram = core.stft(y, n_fft=self.config['n_fft'],
+                                hop_length=self.config['hop_length'],
+                                win_length=self.config['win_length'],
+                                window=self.config['window'],
+                                center=self.config['center'],
                                 dtype=np.complex64,
-                                pad_mode=self._config['pad_mode'])
+                                pad_mode=self.config['pad_mode'])
 
         # get ground truth from file_path string
         one_hot = self.folder_name_to_one_hot(file_path)
 
-        if self._config['calculate_mel']:
+        if self.config['calculate_mel']:
             # filter stft with mel-filter
             spectrogram = self._mel_filter.dot(np.abs(spectrogram)
                                                .astype(np.float32) **
-                                               self._config['power'])
+                                               self.config['power'])
         else:
+            # Crop spectrum at filter frequency:
+            # Crop upper part if 'low'
+            if self.config['filter_config'][0] == 'low':
+                spectrogram = spectrogram[:self._cutoff_bin]
+            # crop lower part else
+            else:
+                spectrogram = spectrogram[self._cutoff_bin:]
+
             spectrogram = librosa.amplitude_to_db(np.abs(spectrogram),
                                                   ref=np.max)
             spectrogram -= np.mean(spectrogram)
@@ -146,8 +178,8 @@ class PreprocessWrapper:
                                        inp=[file_path],
                                        Tout=[tf.float32, tf.uint8])
 
-        spec = tf.ensure_shape(spec, self._config['input_shape'])
-        one_hot = tf.ensure_shape(one_hot, len(self._config['classes']))
+        spec = tf.ensure_shape(spec, self.config['input_shape'])
+        one_hot = tf.ensure_shape(one_hot, len(self.config['classes']))
         return spec, one_hot
 
     def tf_dataset_from_codec(self, codec_dir, train_test_ratio=.8,
@@ -207,7 +239,7 @@ class PreprocessWrapper:
                                       compression='GZIP')
             # Save the config to the folder:
             with open(os.path.join(folder_path, 'DLNet_config.json'), 'w') as fp:
-                json.dump(self._config, fp, sort_keys=True, indent=4)
+                json.dump(self.config, fp, sort_keys=True, indent=4)
         return train_set, test_set
 
     def tf_dataset_from_database(self, db_path: str, train_test_ratio=.8,
@@ -236,7 +268,7 @@ class PreprocessWrapper:
         # Loop over codecs:
         train_set, test_set = self.tf_dataset_from_codec(codecs[0],
                                                          train_test_ratio)
-        for codec in codecs:
+        for codec in codecs[1:]:
             train, test = self.tf_dataset_from_codec(codec, train_test_ratio)
             train_set = train_set.concatenate(train)
             test_set = test_set.concatenate(test)
@@ -256,9 +288,9 @@ class PreprocessWrapper:
             tf.data.experimental.save(dataset=test_set,
                                       path=test_path,
                                       compression='GZIP')
-                                      # Save the config to the folder:
+            # Save the config to the folder:
             with open(os.path.join(folder_path, 'DLNet_config.json'), 'w') as fp:
-                json.dump(self._config, fp, sort_keys=True, indent=4)
+                json.dump(self.config, fp, sort_keys=True, indent=4)
         return train_set, test_set
 
     def get_train_test_lists(self, codec_dir: str, train_test_ratio=.8):
@@ -280,6 +312,8 @@ class PreprocessWrapper:
         """
         # Number of subfolders:
         n_folders = len(glob.glob(os.path.join(codec_dir, '**')))
+        # Take only 35 tracks
+        n_folders = 35
         # Seed list
         seeds = list(range(1, n_folders+1))
         # Train and test indices:
@@ -307,9 +341,9 @@ class PreprocessWrapper:
             Dataset
         """
         return tf.data.experimental.load(directory,
-                        (tf.TensorSpec(self._config['input_shape'],
+                        (tf.TensorSpec(self.config['input_shape'],
                                        dtype=tf.float32, name=None),
-                         tf.TensorSpec(len(self._config['classes']),
+                         tf.TensorSpec(len(self.config['classes']),
                                        dtype=tf.uint8, name=None)),
                         compression='GZIP')
 
@@ -338,4 +372,12 @@ class PreprocessWrapper:
 
     @property
     def classes(self):
-        return self._config['classes']
+        return self.config['classes']
+
+    @property
+    def config(self):
+        return self._config
+
+    @config.setter
+    def config(self, config):
+        self._config = config

@@ -3,72 +3,66 @@ from DLNet_functions import PreprocessWrapper
 import glob
 import tensorflow as tf
 import os
+from time import strftime
 
 
 @pytest.fixture
 def wrapper():
-    CALCULATE_MEL = False
-    config: {} = {'sr': 44100,
+    time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
+    config: {} = {'time_stamp': time_stamp,
+                  'sr': 44100,
                   'audio_length': 1,
                   'mono': True,
                   'n_mels': 64,
                   'n_fft': 1024,
                   'hop_length': 256,
                   'win_length': 512,
-                  'window': 'hann',
+                  'window': 'hamm',
                   'center': True,
                   'pad_mode': 'reflect',
                   'power': 2.0,
-                  'calculate_mel': CALCULATE_MEL,
-                  'filter_signal': False
-                  }
+                  'calculate_mel': False,
+                  'filter_signal': True,
+                  'filter_config': ['high', 4000],
+                  'random_seed': 10,
+                  'binary': False
+                 }
 
     # save number of frames from length in samples divided by fft hop length
     config['n_frames']: int = int(
         config['sr']*config['audio_length']/config['hop_length']) + 1
 
-    # save input shape for model
-    if CALCULATE_MEL:
-        config['input_shape']: (int, int, int) = (config['n_mels'],
-                                                  config['n_frames'], 1)
-    else:
-        config['input_shape']: (int, int, int) = (config['n_fft'], 
-                                                  config['n_frames'], 1)
     ds_config = "dl4aed_project/Code/_data/dataset_config.json"
-    return PreprocessWrapper(config, ds_config, binary=False)
+    return PreprocessWrapper(config, ds_config)
 
 
 def test_init():
-    CALCULATE_MEL = True
-    config: {} = {'sr': 44100,
+    time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
+    config: {} = {'time_stamp': time_stamp,
+                  'sr': 44100,
                   'audio_length': 1,
                   'mono': True,
                   'n_mels': 64,
                   'n_fft': 1024,
                   'hop_length': 256,
                   'win_length': 512,
-                  'window': 'hann',
+                  'window': 'hamm',
                   'center': True,
                   'pad_mode': 'reflect',
                   'power': 2.0,
-                  'calculate_mel': CALCULATE_MEL,
-                  'filter_signal': False
-                  }
+                  'calculate_mel': False,
+                  'filter_signal': True,
+                  'filter_config': ['high', 4000],
+                  'random_seed': 10,
+                  'binary': False
+                 }
 
     # save number of frames from length in samples divided by fft hop length
     config['n_frames']: int = int(
         config['sr']*config['audio_length']/config['hop_length']) + 1
-
-    # save input shape for model
-    if CALCULATE_MEL:
-        config['input_shape']: (int, int, int) = (config['n_mels'],
-                                                  config['n_frames'], 1)
-    else:
-        config['input_shape']: (int, int, int) = (config['n_fft'], 
-                                                  config['n_frames'], 1)
     ds_config = "dl4aed_project/Code/_data/dataset_config.json"
-    assert isinstance(PreprocessWrapper(config, ds_config, binary=False),
-                      PreprocessWrapper) is True
+    wrapper = PreprocessWrapper(config, ds_config)
+    assert isinstance(wrapper, PreprocessWrapper) is True
 
 
 def test_folder_name_to_one_hot(wrapper):

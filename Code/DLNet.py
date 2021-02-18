@@ -16,7 +16,7 @@ assert tf.__version__ >= "2.0"
 # autotune computation
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 RANDOM_SEED = 10
-DATA_PATH = 'Code/_data'
+DATA_PATH = '_data'
 
 # %%
 # Create Config for preprocessing and pipeline parameters
@@ -38,7 +38,8 @@ config: {} = {'time_stamp': time_stamp,
               'pad_mode': 'reflect',
               'power': 2.0,
               'calculate_mel': False,
-              'filter_signal': False,
+              'filter_signal': True,
+              'filter_config': ['high', 4000],
               'random_seed': 10,
               'binary': False
               }
@@ -48,74 +49,21 @@ config: {} = {'time_stamp': time_stamp,
 config['n_frames']: int = int(
     config['sr']*config['audio_length']/config['hop_length']) + 1
 
-# save input shape for model
-if config['calculate_mel']:
-    config['input_shape']: (int, int, int) = (config['n_mels'],
-                                              config['n_frames'], 1)
-else:
-    config['input_shape']: (int, int, int) = (int(config['n_fft']/2 + 1),
-                                              config['n_frames'], 1)
-
-
-# save config
-with open('DLNet_config.json', 'a') as fp:
-    json.dump(config, fp, sort_keys=True, indent=4)
-
 # Creater wrapper object:
-ds_config: str = 'Code/_data/dataset_config.json'
+ds_config: str = os.path.join(DATA_PATH, 'dataset_config.json')
 wrapper: PreprocessWrapper = PreprocessWrapper(config, ds_config)
 
+# save config
+# with open('DLNet_config.json', 'a') as fp:
+#     json.dump(wrapper.config, fp, sort_keys=True, indent=4)
 
-# %%
-# Create dataset from MedleyDB
-# train_aac, test_aac = wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/mp3_320k')
-# train_wav, test_wav = wrapper.tf_dataset_from_codec('_data/MedleyDB/uncompr_wav')
-# test_dataset = test_wav.concatenate(test_aac)
-# train_dataset = train_wav.concatenate(train_aac)
-# train_dataset, test_dataset = wrapper.tf_dataset_from_database(
-#                                     os.path.join(DATA_PATH, 'MedleyDB'))
-
-# train_data = '/home/linus/tubCloud/Documents/MedleyDB_temp_olf_version/compressed_wav/mp3_32k/*.wav'
-# more_data = '/home/linus/tubCloud/Documents/MedleyDB_temp_olf_version/uncompr_wav/*.wav'
-
-# %% Saving datasets
-# dataset = tf.data.Dataset.list_files(train_data)
-# dataset = dataset.concatenate(tf.data.Dataset.list_files(more_data))
-# dataset = dataset.map(wrapper.preprocessing_wrapper,
-#                           num_parallel_calls=AUTOTUNE)
-# wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/mp3_32k',
-#                               save=True)
-# wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/mp3_160k',
-#                               save=True)
-# wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/mp3_192k',
-#                               save=True)
-# wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/mp3_320k',
-#                               save=True)
-# wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/ogg_vbr',
-#                               save=True)
-# wrapper.tf_dataset_from_codec('_data/MedleyDB/compressed_wav/aac_128',
-#                               save=True)
-# wrapper.tf_dataset_from_codec('_data/MedleyDB/uncompr_wav', save=True)
+# %% Saving dataset
 train_dataset, test_dataset = wrapper.tf_dataset_from_database(
                                     os.path.join(DATA_PATH, 'MedleyDB'),
                                     save=True)
 
-# # %%
-# # Loading a dataset
-# train_path_compr = os.path.join(DATA_PATH, 'MedleyDB/dataset_mp3320k_binary_no_filter/mp3_320k_train_set')
-# test_path_compr = os.path.join(DATA_PATH, 'MedleyDB/dataset_mp3320k_binary_no_filter/mp3_320k_test_set')
-# train_path_uncompr = os.path.join(DATA_PATH, 'MedleyDB/dataset_wav_binary_no_filter/uncompr_wav_train_set')
-# test_path_uncompr = os.path.join(DATA_PATH, 'MedleyDB/dataset_wav_binary_no_filter/uncompr_wav_test_set')
-
-# train_compr_set =  wrapper.load_tf_dataset(train_path_compr)
-# train_uncompr_set = wrapper.load_tf_dataset(train_path_uncompr)
-# train_dataset = train_uncompr_set.concatenate(train_compr_set)
-
-# test_compr_set =  wrapper.load_tf_dataset(test_path_compr)
-# test_uncompr_set = wrapper.load_tf_dataset(test_path_uncompr)
-# test_dataset = test_uncompr_set.concatenate(test_compr_set)
-# # %%
-# # VISUALIZE WAVEFORMS
+# %%
+# VISUALIZE WAVEFORMS
 # # get all wav files
 # fps = glob.glob('_data/MedleyDB/compressed_wav/**/*.wav', recursive=True)
 # fps_random = []
@@ -137,7 +85,7 @@ train_dataset, test_dataset = wrapper.tf_dataset_from_database(
 #         # save random audio filepaths
 #         fps_random.append(fp_random)
 
-# # %%
+# %%
 # # VISUALIZE SPECTROGRAMS
 # # setup subplot
 # specs_c = [None]*4
@@ -196,97 +144,3 @@ train_dataset, test_dataset = wrapper.tf_dataset_from_database(
 # plt.title(uncompr_file_path[3])
 # plt.colorbar(format='%+2.0f dB')
 # plt.show()
-
-# # %% Prepare dataset
-# train_size = len(train_dataset)
-# test_size = len(test_dataset)
-# eval_size = int(.1*train_size)
-# batch_size = 64
-
-# # Shuffel train data:
-# train_dataset = train_dataset.shuffle(buffer_size=train_size)
-
-# # Split train into train and eval set:
-# eval_dataset = train_dataset.take(eval_size)
-# eval_dataset = eval_dataset.batch(batch_size).prefetch(AUTOTUNE)
-
-# # Train dataset
-# train_dataset = train_dataset.skip(eval_size)
-# train_dataset = train_dataset.shuffle(train_size - eval_size)
-# train_dataset = train_dataset.batch(batch_size)
-# train_dataset = train_dataset.prefetch(AUTOTUNE)
-
-# # Prepare test dataset
-# test_dataset = test_dataset.batch(batch_size).prefetch(AUTOTUNE)
-
-# # # Split dataset in 80:20 (test:train)
-# # buff_size: int = len(dataset)
-# # train_size: int = int(.8*buff_size)
-# # test_size: int = buff_size - train_size
-# # # shuffle before splitting in train and eval dataset
-# # dataset = dataset.shuffle(buffer_size=buff_size)
-# # dataset = dataset.cache()
-
-# # # take first 80% from dataset
-# # train_dataset = dataset.take(train_size)
-# # train_dataset = train_dataset.shuffle(buffer_size=train_size)
-# # train_dataset = train_dataset.batch(64)
-# # train_dataset = train_dataset.prefetch(AUTOTUNE)
-
-# # # take last 20% samples from dataset
-# # test_dataset = dataset.skip(test_size).shuffle(test_size)
-# # test_dataset = test_dataset.batch(64).prefetch(AUTOTUNE)
-# # eval_dataset = test_dataset
-
-
-# # %%
-# # Build model architecture
-# MODEL_TYPE = ModelType.HENNEQUIN
-# model_builder = ModelBuilder(MODEL_TYPE, config['input_shape'],
-#                              config['classes'])
-# model = model_builder.get_model()
-
-# # Define metrics
-# metrics = [tf.keras.metrics.TrueNegatives(),
-#            tf.keras.metrics.TruePositives(),
-#            tf.keras.metrics.FalseNegatives(),
-#            tf.keras.metrics.FalsePositives(),
-#            tf.keras.metrics.Precision(),
-#            tf.keras.metrics.Recall(),
-#            tf.keras.metrics.CategoricalAccuracy()
-#            ]
-# # %%
-# # compile model
-# n_epochs = 5
-# model.compile(optimizer='adam',
-#               loss='binary_crossentropy',
-#               metrics=['accuracy'])
-
-# # fit model
-# history = model.fit(train_dataset, epochs=n_epochs,
-#                     validation_data=eval_dataset, verbose=1)
-
-# model.evaluate(test_dataset, batch_size=64)
-
-# # %%
-# # setup plot
-# fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(16, 4))
-
-# # plot loss
-# ax[0].plot(range(n_epochs), history.history['loss'])
-# ax[0].plot(range(n_epochs), history.history['val_loss'])
-# ax[0].set_ylabel('loss'), ax[0].set_title('train_loss vs val_loss')
-
-# # plot accuracy
-# ax[1].plot(range(n_epochs), history.history['categorical_accuracy'])
-# ax[1].plot(range(n_epochs), history.history['val_categorical_accuracy'])
-# ax[1].set_ylabel('accuracy'), ax[1].set_title('train_acc vs val_acc')
-
-# # plot adjustement
-# for a in ax:
-#     a.grid(True)
-#     a.legend(['train', 'val'], loc=4)
-#     a.set_xlabel('num of Epochs')
-# plt.show()
-
-# # %%
