@@ -8,9 +8,8 @@ import librosa
 import os
 from librosa import display
 import matplotlib.pyplot as plt
-from wrapper_functions import PreprocessWrapper
 
-DATA_PATH = '_data'
+DATA_PATH = '/home/linus/tubCloud/Documents/3.Semester/DL4AED/raw_datasets'
 # DATASET_CONFIG: str = os.path.join(DATA_PATH, 'dataset_config.json')
 DATASET_NAME = 'Examples_10s'
 config: {} = {'sr': 44100,
@@ -30,12 +29,6 @@ config: {} = {'sr': 44100,
               'random_seed': 10,
               'binary': False
               }
-
-# # save number of frames from length in samples divided by fft hop length
-# config['n_frames']: int = int(
-#     config['sr']*config['audio_length']/config['hop_length']) + 1
-
-# wrapper: PreprocessWrapper = PreprocessWrapper(config, DATASET_CONFIG)
 
 # %%
 # Get all wav files and spectrograms
@@ -118,4 +111,24 @@ plt.colorbar(format='%+2.0f dB')
 plt.tight_layout()
 plt.savefig('plots/example_specs_log_scale_16_9.png', dpi=300)
 
+# %%
+fig = plt.figure(figsize=(16, 9))
+# fig.suptitle('Spectrograms', fontsize=16)
+plt.subplot(2, 1, 1)
+librosa.display.specshow(specs[0], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         x_axis='time',
+                         y_axis='linear')
+plt.title(labels[0])
+plt.xticks
+plt.colorbar(format='%+2.0f dB')
+plt.subplot(2, 1, 2)
+librosa.display.specshow(specs[-2], sr=config['sr'],
+                         hop_length=config['hop_length'],
+                         x_axis='time',
+                         y_axis='linear')
+plt.title(labels[-2])
+plt.colorbar(format='%+2.0f dB')
+fig.tight_layout() 
+plt.savefig('plots/example_specs_linear_scale_2_1.png', dpi=300)
 # %%
