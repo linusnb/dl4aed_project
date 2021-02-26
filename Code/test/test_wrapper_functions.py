@@ -1,9 +1,9 @@
-import pytest
-from ..wrapper_functions import PreprocessWrapper
-import glob
-import tensorflow as tf
-import os
 from time import strftime
+import os
+import tensorflow as tf
+import glob
+import pytest
+from wrapper_functions import PreprocessWrapper
 
 
 @pytest.fixture

@@ -296,7 +296,8 @@ class PreprocessWrapper:
     def get_train_test_lists(self, codec_dir: str, train_test_ratio=.8):
         """
         Returns two lists of subfolders in codec_dir for train and test
-        directories.
+        directories. To keep the dataset small, only the first 35 folders are
+        taken.
 
         Parameters
         ----------
@@ -313,7 +314,7 @@ class PreprocessWrapper:
         # Number of subfolders:
         n_folders = len(glob.glob(os.path.join(codec_dir, '**')))
         # Take only 35 tracks
-        n_folders = 35
+        n_folders = 35 if n_folders> 35 else n_folders
         # Seed list
         seeds = list(range(1, n_folders+1))
         # Train and test indices:

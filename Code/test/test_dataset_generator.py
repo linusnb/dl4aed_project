@@ -1,9 +1,8 @@
 import pytest
 import glob
-from ..Database_Generation.dataset_generator import Dataset
 import librosa
 import os
-
+from Database_Generation.dataset_generator import Dataset
 
 @pytest.fixture
 def datapath():

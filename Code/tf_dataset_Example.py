@@ -1,27 +1,22 @@
 # %%
-from pathlib import Path
-import json
-import glob
-from re import VERBOSE
-import numpy as np
-import librosa
-import os
-from librosa import display
-import matplotlib.pyplot as plt
 from wrapper_functions import PreprocessWrapper
+import os
 import tensorflow as tf
 from time import strftime
 assert tf.__version__ >= "2.0"
-# autotune computation
-AUTOTUNE = tf.data.experimental.AUTOTUNE
-RANDOM_SEED = 10
+
+# set path to raw dataset folder
 DATA_PATH = '_data'
+# Name of raw dataset folder
+DATASET_NAME = 'Example_raw_dataset'
+# Path to raw dataset config
+ds_config: str = os.path.join(DATA_PATH, 'dataset_config.json')
+
+# %% set cwd
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 # %%
 # Create Config for preprocessing and pipeline parameters
-
-# if true analysis is conducted with mel-spectrograms, if false with "full"
-# spectrograms
 time_stamp = f'{strftime("%d_%m_%Y_%H_%M")}'
 
 config: {} = {'time_stamp': time_stamp,
@@ -49,12 +44,9 @@ config['n_frames']: int = int(
     config['sr']*config['audio_length']/config['hop_length']) + 1
 
 # Creater wrapper object:
-ds_config: str = os.path.join(DATA_PATH, 'dataset_config.json')
 wrapper: PreprocessWrapper = PreprocessWrapper(config, ds_config)
 
-# %% Saving dataset
+# Create new dataset from raw database
 train_dataset, test_dataset = wrapper.tf_dataset_from_database(
-                                    os.path.join(DATA_PATH, 'VinylDB'),
+                                    os.path.join(DATA_PATH, DATASET_NAME),
                                     save=True)
-
-# %%

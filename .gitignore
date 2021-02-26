@@ -22,3 +22,9 @@ _data/
 *.mp3
 *.aac
 *.flac
+
+# test files
+test/
+
+# python files
+visualizer.py

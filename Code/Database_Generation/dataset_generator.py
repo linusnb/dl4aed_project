@@ -1,5 +1,4 @@
 import os
-from os.path import split
 import subprocess
 import json
 import numpy as np
@@ -8,10 +7,9 @@ import glob
 import matplotlib.pyplot as plt
 import random
 
-
 class Dataset:
 
-    def __init__(self, json_file: str, root_specifc: str) -> None:
+    def __init__(self, json_file: str, root_name: str) -> None:
         """__init__
         Constructs dataset object from json config file.
 
@@ -19,6 +17,8 @@ class Dataset:
         ----------
         json_file : str
             Path to json config file.
+        root_name : str
+            Name of the database folder with the seed folder included.
         """
         # Read json Dataset_config
         with open(json_file, "r") as read_file:
@@ -26,11 +26,11 @@ class Dataset:
         # Root dir:
         self._root_dir, _ = os.path.split(json_file)
         # Add root specification
-        self._root_dir = os.path.join(self._root_dir, root_specifc)
+        self._root_dir = os.path.join(self._root_dir, root_name)
         # Get seed path:
         self._seed_dir = os.path.join(self._root_dir,
                                       config['reference_audio_path'])
-                                      # Get location of uncompressed waves
+        # Get location of uncompressed waves
         self._uncompr_dir = os.path.join(self._root_dir,
                                          config['uncompr_audio_path'])
         # Get location of compressed waves
@@ -95,7 +95,7 @@ class Dataset:
         n_samples = data.shape[0]
         # Reshape cropped data into arrays of chunk_length:
         chunk_arr = np.reshape(data, (n_chunks, int(n_samples/n_chunks),
-                               n_channels))
+                                      n_channels))
         # Filter depending on RMS value: chunk rms > .5*data_rms
         filter = np.sqrt(np.mean(chunk_arr**2, axis=(1, 2))) > \
                         (.5*np.sqrt(np.mean(chunk_arr**2)))
@@ -135,7 +135,7 @@ class Dataset:
         Raises
         ------
         ValueError
-            [description]
+            Input file with ame name already in seed list.
         """
         # Get filename of input file
         # Remove path extension of input file
@@ -150,7 +150,7 @@ class Dataset:
             n_seeds = len(lines)
             seed_name = in_f_name_wav+'\n'
             if seed_name in lines:
-                raise ValueError(f"File with same name alread in seed \
+                raise ValueError(f"File with same name already in seed \
                                  list:{in_f_name_wav}")
 
         is_split = False
@@ -162,7 +162,7 @@ class Dataset:
                 # Output path: dataset_name/compressed_wav/codec_name/
                 # seed_number
                 enc_output_path = os.path.join(self._compr_dir, codec,
-                                            str(n_seeds+1))
+                                               str(n_seeds+1))
                 # If compressed output directory not existing -> make directory
                 if not os.path.isdir(enc_output_path):
                     os.makedirs(os.path.join(enc_output_path))
