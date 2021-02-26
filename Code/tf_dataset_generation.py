@@ -9,7 +9,6 @@ import os
 from librosa import display
 import matplotlib.pyplot as plt
 from wrapper_functions import PreprocessWrapper
-from models import ModelType, ModelBuilder
 import tensorflow as tf
 from time import strftime
 assert tf.__version__ >= "2.0"
@@ -55,5 +54,7 @@ wrapper: PreprocessWrapper = PreprocessWrapper(config, ds_config)
 
 # %% Saving dataset
 train_dataset, test_dataset = wrapper.tf_dataset_from_database(
-                                    os.path.join(DATA_PATH, 'OtherWAV'),
+                                    os.path.join(DATA_PATH, 'VinylDB'),
                                     save=True)
+
+# %%
